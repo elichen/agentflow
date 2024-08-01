@@ -262,7 +262,7 @@ class SlackInteractor:
         # Sort messages by timestamp (oldest first)
         sorted_messages = all_messages.sort_values('ts')
 
-        # Create a set of thread_ts values from new_messages
+        # Create a set of thread_ts values from new_messages, including top-level messages
         new_message_threads = set(new_messages['thread_ts'].dropna().unique()) | set(new_messages['ts'])
 
         # Group messages by thread_ts (or ts if it's the start of a thread)
@@ -292,9 +292,8 @@ class SlackInteractor:
                     })
                     seen_messages.add(message_key)
             
-            # Only include threads with more than one message
-            if len(thread['messages']) > 1:
-                organized_threads.append(thread)
+            # Include all threads, even those with only one message
+            organized_threads.append(thread)
 
         # Sort threads by their first message's timestamp
         organized_threads.sort(key=lambda x: x['thread_ts'])

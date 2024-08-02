@@ -5,7 +5,7 @@ import anthropic
 class LLMInteractor:
     def __init__(self):
         self.client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-        self.model = "claude-3-opus-20240229"  # Using Claude 3.5 Opus model
+        self.model = "claude-3-5-sonnet-20240620"
 
     def generate_thread_response(self, thread: Dict[str, Any], guideline_prompt: str) -> str:
         # Prepare the conversation history

@@ -246,6 +246,41 @@ class SlackInteractor:
             as_user='Slackbot'
         )
 
+    def post_thread_reply(self, thread: Dict[str, Any], reply_text: str) -> Dict[str, Any]:
+        """
+        Posts a reply to a specific thread in Slack.
+
+        :param thread: A dictionary containing thread information, as returned by organize_threads()
+        :param reply_text: The text of the reply to post
+        :return: The response from the Slack API
+        """
+        channel = thread['channel']
+        thread_ts = thread['thread_ts']
+
+        # Convert thread_ts to a string if it's a Timestamp object
+        if isinstance(thread_ts, pd.Timestamp):
+            thread_ts = thread_ts.timestamp()
+        elif isinstance(thread_ts, str):
+            # If it's already a string, ensure it's in the correct format
+            try:
+                thread_ts = float(thread_ts)
+            except ValueError:
+                # If it can't be converted to float, it might already be in the correct format
+                pass
+
+        try:
+            result = self.exponential_backoff(
+                self.bot_client.chat_postMessage,
+                channel=channel,
+                text=reply_text,
+                thread_ts=str(thread_ts)  # Convert to string for consistency
+            )
+            print(f"Posted reply to thread {thread_ts} in channel {channel}")
+            return result
+        except SlackApiError as e:
+            print(f"Error posting reply to thread: {e}")
+            raise e
+            
     def organize_threads(self, new_messages: pd.DataFrame, file_path: str = 'complete_conversations.pkl') -> List[Dict[str, Any]]:
         if new_messages is None or new_messages.empty:
             return []  # Return an empty list if there are no new messages

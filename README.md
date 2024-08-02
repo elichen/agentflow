@@ -7,3 +7,7 @@ SLACK_BOT_TOKEN
 SLACK_USER_TOKEN
 ANTHROPIC_API_KEY
 ```
+# Running
+```
+python runner.py
+```

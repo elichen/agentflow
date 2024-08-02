@@ -300,6 +300,9 @@ class SlackInteractor:
         # Create a set of thread_ts values from new_messages, including top-level messages
         new_message_threads = set(new_messages['thread_ts'].dropna().unique()) | set(new_messages['ts'])
 
+        # Get current time
+        current_time = pd.Timestamp.now()
+
         # Group messages by thread_ts (or ts if it's the start of a thread)
         threads = defaultdict(list)
         for _, message in sorted_messages.iterrows():
@@ -319,11 +322,16 @@ class SlackInteractor:
             for message in messages:
                 message_key = (message['ts'], message['user'], message['text'])
                 if message_key not in seen_messages:
+                    # Calculate minutes ago
+                    message_time = pd.to_datetime(message['ts'])
+                    minutes_ago = int((current_time - message_time).total_seconds() / 60)
+                    
                     thread['messages'].append({
                         'ts': message['ts'],
                         'user': message['user_name'],
                         'text': message['text'],
-                        'is_bot': message.get('is_bot', False)
+                        'is_bot': message.get('is_bot', False),
+                        'minutes_ago': minutes_ago
                     })
                     seen_messages.add(message_key)
             

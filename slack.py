@@ -1,7 +1,7 @@
 import os
 import time
 import random
-from typing import List, Dict, Any, Callable
+from typing import List, Dict, Any, Callable, Optional
 from collections import defaultdict
 
 import pandas as pd
@@ -88,16 +88,90 @@ class SlackInteractor:
             cursor=cursor
         )
 
+    def fetch_thread(self, thread_ts: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetch a specific thread by its timestamp.
+
+        :param thread_ts: The timestamp of the thread to fetch
+        :return: A dictionary containing the thread information, or None if not found
+        """
+        all_channels = self.fetch_conversations()
+        users = self.fetch_user_list()
+        
+        for channel in all_channels:
+            try:
+                result = self.exponential_backoff(
+                    self.user_client.conversations_replies,
+                    channel=channel['id'],
+                    ts=thread_ts
+                )
+                
+                if result['ok'] and result['messages']:
+                    messages = result['messages']
+                    thread_data = {
+                        'channel': channel['name'],
+                        'thread_ts': thread_ts,
+                        'messages': []
+                    }
+                    
+                    current_time = pd.Timestamp.now()
+                    
+                    for msg in messages:
+                        message_time = pd.to_datetime(float(msg['ts']), unit='s')
+                        minutes_ago = int((current_time - message_time).total_seconds() / 60)
+                        
+                        user_info = users[users['id'] == msg.get('user', '')]
+                        if not user_info.empty:
+                            user_name = user_info.iloc[0]['user_name']
+                            is_bot = user_info.iloc[0]['is_bot']
+                        else:
+                            user_name = 'Unknown User'
+                            is_bot = False
+                        
+                        thread_data['messages'].append({
+                            'ts': msg['ts'],
+                            'user': msg.get('user', 'Unknown'),
+                            'user_name': user_name,
+                            'text': msg['text'],
+                            'is_bot': is_bot,
+                            'minutes_ago': minutes_ago
+                        })
+                    
+                    return thread_data
+                
+            except SlackApiError as e:
+                if e.response['error'] != 'thread_not_found':
+                    print(f"Error fetching thread in channel {channel['name']}: {e}")
+        
+        print(f"Thread with ts {thread_ts} not found in any channel")
+        return None
+
     def fetch_user_list(self) -> pd.DataFrame:
-        all_users = self.exponential_backoff(self.user_client.users_list)
-        all_users = pd.DataFrame(all_users['members'])
-        all_users = all_users.loc[
-            ~(all_users.real_name.isna()),
-            ['id', 'name', 'is_bot']
-        ]
-        all_users['name'] = all_users.name.str.capitalize()
-        all_users.rename({'name': 'user_name'}, axis=1, inplace=True)
-        return all_users
+        """
+        Fetch the list of all users in the Slack workspace.
+
+        :return: DataFrame containing user information with columns 'id', 'user_name', and 'is_bot'
+        """
+        try:
+            result = self.exponential_backoff(self.user_client.users_list)
+            
+            users = []
+            for member in result['members']:
+                users.append({
+                    'id': member['id'],
+                    'user_name': member.get('real_name', member['name']),
+                    'is_bot': member.get('is_bot', False)
+                })
+            
+            users_df = pd.DataFrame(users)
+            users_df['user_name'] = users_df['user_name'].str.capitalize()
+            
+            return users_df
+
+        except SlackApiError as e:
+            print(f"Error fetching user list: {e}")
+            # Return an empty DataFrame with the correct columns if there's an error
+            return pd.DataFrame(columns=['id', 'user_name', 'is_bot'])
 
     def fetch_mess_from_multi_channels(self, channels: List[str]) -> pd.DataFrame:
         out = []

@@ -2,6 +2,7 @@ import os
 from typing import Dict, List, Any
 import anthropic
 from db import ActionItemDatabase
+import pandas as pd
 
 class LLMInteractor:
     def __init__(self):

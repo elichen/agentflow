@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timedelta
+import pandas as pd
 
 class ActionItemDatabase:
     def __init__(self, file_path='action_items.json'):
@@ -9,34 +10,41 @@ class ActionItemDatabase:
     def load_items(self):
         try:
             with open(self.file_path, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+            # Convert string timestamps back to Timestamp objects
+            return {pd.Timestamp(k): v for k, v in data.items()}
         except FileNotFoundError:
             return {}
 
     def save_items(self):
+        # Convert Timestamp keys to strings for JSON serialization
+        serializable_items = {str(k): v for k, v in self.action_items.items()}
         with open(self.file_path, 'w') as f:
-            json.dump(self.action_items, f, indent=2)
+            json.dump(serializable_items, f, indent=2)
 
     def add_item(self, thread_id, channel, description, due_days=1):
-        created = datetime.now().isoformat()
-        due = (datetime.now() + timedelta(days=due_days)).isoformat()
-        if thread_id not in self.action_items:
-            self.action_items[thread_id] = []
-        self.action_items[thread_id].append({
+        created = pd.Timestamp.now()
+        due = created + pd.Timedelta(days=due_days)
+        thread_ts = pd.Timestamp(thread_id)
+        if thread_ts not in self.action_items:
+            self.action_items[thread_ts] = []
+        self.action_items[thread_ts].append({
             'channel': channel,
             'description': description,
-            'created': created,
-            'due': due,
+            'created': created.isoformat(),
+            'due': due.isoformat(),
             'status': 'open'
         })
         self.save_items()
 
     def get_items(self, thread_id):
-        return self.action_items.get(thread_id, [])
+        thread_ts = pd.Timestamp(thread_id)
+        return self.action_items.get(thread_ts, [])
 
     def update_item_status(self, thread_id, description, status):
-        if thread_id in self.action_items:
-            for item in self.action_items[thread_id]:
+        thread_ts = pd.Timestamp(thread_id)
+        if thread_ts in self.action_items:
+            for item in self.action_items[thread_ts]:
                 if item['description'] == description:
                     item['status'] = status
                     self.save_items()
@@ -44,5 +52,5 @@ class ActionItemDatabase:
         return False
 
     def get_all_open_thread_ids(self):
-        return [thread_id for thread_id, items in self.action_items.items() 
+        return [str(thread_id) for thread_id, items in self.action_items.items() 
                 if any(item['status'] == 'open' for item in items)]

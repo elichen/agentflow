@@ -15,18 +15,26 @@ class LLMInteractor:
         thread_id = thread['thread_ts']
         channel = thread['channel']
 
+        # Check if the thread has been inactive for more than a day
+        last_activity = pd.Timestamp(thread['messages'][-1]['ts'])
+        time_since_last_activity = pd.Timestamp.now() - last_activity
+
         # Check for completed items
         self._check_completed_items(thread_id, conversation)
 
         # Identify new action items
         new_items = self._identify_new_items(thread_id, channel, conversation)
 
-        # Generate reminders for open items
-        reminders = self._generate_reminders(thread_id)
+        # Generate reminders for open items only if thread is inactive for more than a day
+        if time_since_last_activity > pd.Timedelta(days=1):
+            reminders = self._generate_reminders(thread_id)
+        else:
+            reminders = "No reminders needed at this time."
 
         return {
             'new_items': new_items,
-            'reminders': reminders
+            'reminders': reminders,
+            'time_since_last_activity': time_since_last_activity
         }
 
     def _check_completed_items(self, thread_id: str, conversation: str):

@@ -88,6 +88,26 @@ class SlackInteractor:
             cursor=cursor
         )
 
+    @staticmethod
+    def convert_timestamp(timestamp: Any, to_slack: bool = True) -> str:
+        """
+        Convert between Slack timestamp format and datetime string format.
+        
+        :param timestamp: The timestamp to convert
+        :param to_slack: If True, convert to Slack format. If False, convert from Slack format.
+        :return: Converted timestamp string
+        """
+        if to_slack:
+            if isinstance(timestamp, str):
+                dt = pd.to_datetime(timestamp)
+            elif isinstance(timestamp, pd.Timestamp):
+                dt = timestamp
+            else:
+                raise ValueError(f"Unsupported timestamp type: {type(timestamp)}")
+            return f"{dt.timestamp():.6f}"
+        else:
+            return str(pd.to_datetime(float(timestamp), unit='s'))
+        
     def fetch_thread(self, thread_ts: str) -> Optional[Dict[str, Any]]:
         """
         Fetch a specific thread by its timestamp.
@@ -98,12 +118,14 @@ class SlackInteractor:
         all_channels = self.fetch_conversations()
         users = self.fetch_user_list()
         
+        slack_ts = self.convert_timestamp(thread_ts, to_slack=True)
+        
         for channel in all_channels:
             try:
                 result = self.exponential_backoff(
                     self.user_client.conversations_replies,
                     channel=channel['id'],
-                    ts=thread_ts
+                    ts=slack_ts
                 )
                 
                 if result['ok'] and result['messages']:
@@ -129,7 +151,7 @@ class SlackInteractor:
                             is_bot = False
                         
                         thread_data['messages'].append({
-                            'ts': msg['ts'],
+                            'ts': self.convert_timestamp(msg['ts'], to_slack=False),
                             'user': msg.get('user', 'Unknown'),
                             'user_name': user_name,
                             'text': msg['text'],
@@ -331,23 +353,15 @@ class SlackInteractor:
         channel = thread['channel']
         thread_ts = thread['thread_ts']
 
-        # Convert thread_ts to a string if it's a Timestamp object
-        if isinstance(thread_ts, pd.Timestamp):
-            thread_ts = thread_ts.timestamp()
-        elif isinstance(thread_ts, str):
-            # If it's already a string, ensure it's in the correct format
-            try:
-                thread_ts = float(thread_ts)
-            except ValueError:
-                # If it can't be converted to float, it might already be in the correct format
-                pass
+        # Convert thread_ts to Slack format
+        slack_ts = self.convert_timestamp(thread_ts, to_slack=True)
 
         try:
             result = self.exponential_backoff(
                 self.bot_client.chat_postMessage,
                 channel=channel,
                 text=reply_text,
-                thread_ts=str(thread_ts)  # Convert to string for consistency
+                thread_ts=slack_ts
             )
             print(f"Posted reply to thread {thread_ts} in channel {channel}")
             return result

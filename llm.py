@@ -1,5 +1,6 @@
 import os
-from typing import Dict, List, Any
+import json
+from typing import Dict, List, Any, Tuple
 import anthropic
 from db import ActionItemDatabase
 import pandas as pd
@@ -10,20 +11,27 @@ class LLMInteractor:
         self.model = "claude-3-opus-20240229"
         self.action_db = ActionItemDatabase()
 
-    def review_and_remind(self, thread: Dict[str, Any]) -> Dict[str, Any]:
+    def review_and_remind(self, thread: Dict[str, Any], return_raw_response: bool = False) -> Dict[str, Any]:
         conversation = self._format_thread(thread)
         thread_id = thread['thread_ts']
         channel = thread['channel']
 
-        # Check if the thread has been inactive for more than a day
         last_activity = pd.Timestamp(thread['messages'][-1]['ts'])
         time_since_last_activity = pd.Timestamp.now() - last_activity
 
+        raw_response = self._get_llm_response(self._generate_review_prompt(conversation))
+        
+        try:
+            parsed_response = json.loads(raw_response)
+        except json.JSONDecodeError:
+            print(f"Error: Unable to parse LLM response as JSON. Raw response:\n{raw_response}")
+            parsed_response = {"action_items": [], "completed_tasks": []}
+
         # Check for completed items
-        self._check_completed_items(thread_id, conversation)
+        self._check_completed_items(thread_id, parsed_response.get('completed_tasks', []))
 
         # Identify new action items
-        new_items = self._identify_new_items(thread_id, channel, conversation)
+        new_items = self._identify_new_items(thread_id, channel, parsed_response.get('action_items', []))
 
         # Generate reminders for open items only if thread is inactive for more than a day
         if time_since_last_activity > pd.Timedelta(days=1):
@@ -31,45 +39,63 @@ class LLMInteractor:
         else:
             reminders = "No reminders needed at this time."
 
-        return {
+        result = {
             'new_items': new_items,
             'reminders': reminders,
             'time_since_last_activity': time_since_last_activity
         }
 
-    def _check_completed_items(self, thread_id: str, conversation: str):
-        completion_prompt = f"""
-        Analyze the following conversation and determine if any previously mentioned tasks or action items have been completed.
-        If a task appears to be completed, respond with the task description. If no tasks are completed, respond with "No completed tasks".
+        if return_raw_response:
+            return result, raw_response
+        else:
+            return result
+
+    def _generate_review_prompt(self, conversation: str) -> str:
+        return f"""
+        Analyze the following conversation and provide a JSON response with the following structure:
+        {{
+            "action_items": [
+                {{
+                    "description": "Brief description of the action item",
+                    "assignee": "Name of the person assigned (if specified), or 'Unassigned'"
+                }}
+            ],
+            "completed_tasks": [
+                "Description of completed task"
+            ]
+        }}
+
+        Include in "action_items":
+        - Direct requests or assignments
+        - Indirect requests or questions that require action
+        - Suggestions that imply action
+
+        If no action items are found or no tasks are completed, return empty arrays for the respective fields.
 
         Conversation:
         {conversation}
 
-        Completed tasks (if any):
+        JSON response:
         """
 
-        response = self._get_llm_response(completion_prompt)
-        if response != "No completed tasks":
-            for item in response.split('\n'):
-                self.action_db.update_item_status(thread_id, item.strip(), 'closed')
+    def _check_completed_items(self, thread_id: str, completed_tasks: List[str]):
+        for task in completed_tasks:
+            print(f"Debug - Marking as completed: {task}")
+            self.action_db.update_item_status(thread_id, task, 'closed')
 
-    def _identify_new_items(self, thread_id: str, channel: str, conversation: str) -> List[str]:
-        identification_prompt = f"""
-        Analyze the following conversation and identify any new tasks, action items, or requests that have been made.
-        For each new item, provide a brief description. If no new items are found, respond with "No new items".
+        print(f"Debug - Total completed items: {len(completed_tasks)}")
 
-        Conversation:
-        {conversation}
-
-        New action items (if any):
-        """
-
-        response = self._get_llm_response(identification_prompt)
+    def _identify_new_items(self, thread_id: str, channel: str, action_items: List[Dict[str, str]]) -> List[str]:
         new_items = []
-        if response != "No new items":
-            for item in response.split('\n'):
-                self.action_db.add_item(thread_id, channel, item.strip())
-                new_items.append(item.strip())
+        for item in action_items:
+            description = item['description']
+            assignee = item['assignee']
+            action_item = f"{description} (Assignee: {assignee})"
+            print(f"Debug - Adding new item: {action_item}")
+            self.action_db.add_item(thread_id, channel, action_item)
+            new_items.append(action_item)
+
+        print(f"Debug - Total new items identified: {len(new_items)}")
         return new_items
 
     def _generate_reminders(self, thread_id: str) -> str:
@@ -107,3 +133,11 @@ class LLMInteractor:
             user_type = "Human" if not message['is_bot'] else "AI"
             formatted_messages.append(f"{user_type} ({message['minutes_ago']} minutes ago): {message['text']}")
         return "\n".join(formatted_messages)
+
+# Usage example:
+# llm_interactor = LLMInteractor()
+# thread = {...}  # Thread object from organize_threads()
+# result, raw_response = llm_interactor.review_and_remind(thread, return_raw_response=True)
+# print(f"Raw LLM response: {raw_response}")
+# print(f"New items: {result['new_items']}")
+# print(f"Reminders: {result['reminders']}")

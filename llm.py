@@ -1,5 +1,6 @@
 import os
 import json
+import re
 from typing import Dict, List, Any, Tuple
 import anthropic
 from db import ActionItemDatabase
@@ -11,31 +12,20 @@ class LLMInteractor:
         self.model = "claude-3-opus-20240229"
         self.action_db = ActionItemDatabase()
 
-    def review_and_remind(self, thread: Dict[str, Any], return_raw_response: bool = False) -> Dict[str, Any]:
+    def process_thread(self, thread: Dict[str, Any], return_raw_response: bool = False) -> Dict[str, Any]:
         conversation = self._format_thread(thread)
         thread_id = thread['thread_ts']
         channel = thread['channel']
-        last_activity = pd.Timestamp(thread['messages'][-1]['ts'])
-        time_since_last_activity = pd.Timestamp.now() - last_activity
         raw_response = self._get_llm_response(self._generate_review_prompt(conversation))
-        try:
-            parsed_response = json.loads(raw_response)
-        except json.JSONDecodeError:
-            print(f"Error: Unable to parse LLM response as JSON. Raw response:\n{raw_response}")
-            action_items = self._extract_action_items(raw_response)
-            completed_tasks = self._extract_completed_tasks(raw_response)
-            parsed_response = {"action_items": action_items, "completed_tasks": completed_tasks}
-        self._check_completed_items(thread_id, parsed_response.get('completed_tasks', []))
-        new_items = self._identify_new_items(thread_id, channel, parsed_response.get('action_items', []))
-        if time_since_last_activity > pd.Timedelta(days=1):
-            reminders = self._generate_reminders(thread_id)
-        else:
-            reminders = "No reminders needed at this time."
+        
+        action_items = self._extract_action_items_from_response(raw_response)
+
+        new_items = self._process_action_items(thread_id, channel, action_items)
+
         result = {
             'new_items': new_items,
-            'reminders': reminders,
-            'time_since_last_activity': time_since_last_activity
         }
+
         if return_raw_response:
             return result, raw_response
         else:
@@ -50,28 +40,37 @@ class LLMInteractor:
                     "description": "Brief description of the action item",
                     "assignee": "Name of the person assigned (if specified), or 'Unassigned'"
                 }}
-            ],
-            "completed_tasks": [
-                "Description of completed task"
             ]
         }}
-        Include in "action_items":
-        - Direct requests or assignments
-        - Indirect requests or questions that require action
-        - Suggestions that imply action
-        If no action items are found or no tasks are completed, return empty arrays for the respective fields.
+        Include in "action_items" only tasks or actions that are not resolved within the conversation.
+        If no unresolved action items are found, return an empty array.
+        Provide only the JSON response without any additional text or explanation.
         Conversation:
         {conversation}
         JSON response:
         """
 
-    def _check_completed_items(self, thread_id: str, completed_tasks: List[str]):
-        for task in completed_tasks:
-            print(f"Debug - Marking as completed: {task}")
-            self.action_db.update_item_status(thread_id, task, 'closed')
-        print(f"Debug - Total completed items: {len(completed_tasks)}")
+    def _extract_action_items_from_response(self, raw_response: str) -> List[Dict[str, str]]:
+        try:
+            # Try to extract JSON from the response
+            json_match = re.search(r'\{[\s\S]*\}', raw_response)
+            if json_match:
+                json_str = json_match.group(0)
+                parsed_response = json.loads(json_str)
+                return parsed_response.get('action_items', [])
+            else:
+                raise ValueError("No JSON found in the response")
+        except (json.JSONDecodeError, ValueError) as e:
+            print(f"Error parsing JSON: {e}")
+            print(f"Raw response:\n{raw_response}")
+            # Fallback to extracting action items manually
+            return self._extract_action_items(raw_response)
 
-    def _identify_new_items(self, thread_id: str, channel: str, action_items: List[Dict[str, str]]) -> List[str]:
+    def _process_action_items(self, thread_id: str, channel: str, action_items: List[Dict[str, str]]) -> List[str]:
+        existing_items = self.action_db.get_items(thread_id)
+        for item in existing_items:
+            self.action_db.delete_item(thread_id, item['description'])
+        
         new_items = []
         for item in action_items:
             description = item['description']
@@ -80,16 +79,14 @@ class LLMInteractor:
             print(f"Debug - Adding new item: {action_item}")
             self.action_db.add_item(thread_id, channel, action_item)
             new_items.append(action_item)
+        
         print(f"Debug - Total new items identified: {len(new_items)}")
         return new_items
 
-    def _generate_reminders(self, thread_id: str) -> str:
-        open_items = [item for item in self.action_db.get_items(thread_id) if item['status'] == 'open']
-        if not open_items:
-            return "No reminders needed at this time."
+    def generate_reminder(self, thread_id: str, item: Dict[str, Any]) -> str:
         reminder_prompt = f"""
-        Generate a friendly reminder for the following open action items. The reminder should encourage action without being pushy or nagging:
-        {', '.join([item['description'] for item in open_items])}
+        Generate a friendly reminder for the following open action item. The reminder should encourage action without being pushy or nagging:
+        {item['description']}
         Reminder:
         """
         return self._get_llm_response(reminder_prompt)
@@ -118,13 +115,10 @@ class LLMInteractor:
     def _extract_action_items(self, raw_response: str) -> List[Dict[str, str]]:
         action_items = []
         for line in raw_response.split('\n'):
-            if line.strip().lower().startswith(("- ", "* ", "1. ", "2. ", "3. ", "4. ", "5. ")):
-                action_items.append({"description": line.strip()[2:], "assignee": "Unassigned"})
+            if "description" in line.lower() and "assignee" in line.lower():
+                parts = line.split(',')
+                if len(parts) >= 2:
+                    description = parts[0].split(':')[-1].strip().strip('"')
+                    assignee = parts[1].split(':')[-1].strip().strip('"')
+                    action_items.append({"description": description, "assignee": assignee})
         return action_items
-
-    def _extract_completed_tasks(self, raw_response: str) -> List[str]:
-        completed_tasks = []
-        for line in raw_response.split('\n'):
-            if "completed" in line.lower() or "done" in line.lower():
-                completed_tasks.append(line.strip())
-        return completed_tasks

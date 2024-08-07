@@ -1,7 +1,5 @@
 import json
-from datetime import datetime, timedelta
 import pandas as pd
-from slack import SlackInteractor  # Import the SlackInteractor class
 
 class ActionItemDatabase:
     def __init__(self, file_path='action_items.json'):
@@ -12,14 +10,12 @@ class ActionItemDatabase:
         try:
             with open(self.file_path, 'r') as f:
                 data = json.load(f)
-            # Convert string timestamps back to Timestamp objects
-            return {pd.Timestamp(SlackInteractor.convert_timestamp(k, to_slack=False)): v for k, v in data.items()}
+            return {pd.Timestamp(k): v for k, v in data.items()}
         except FileNotFoundError:
             return {}
 
     def save_items(self):
-        # Convert Timestamp keys to Slack format for JSON serialization
-        serializable_items = {SlackInteractor.convert_timestamp(k, to_slack=True): v for k, v in self.action_items.items()}
+        serializable_items = {str(k): v for k, v in self.action_items.items()}
         with open(self.file_path, 'w') as f:
             json.dump(serializable_items, f, indent=2)
 

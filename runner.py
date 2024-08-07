@@ -9,7 +9,6 @@ SLEEP_PERIOD = 300
 
 def process_threads(interactor: SlackInteractor, llm_interactor: LLMInteractor, threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     results = []
-    
     open_thread_ids = llm_interactor.action_db.get_all_open_thread_ids()
     all_thread_ids = set([thread['thread_ts'] for thread in threads] + open_thread_ids)
     
@@ -24,7 +23,6 @@ def process_threads(interactor: SlackInteractor, llm_interactor: LLMInteractor, 
             print(f"Thread timestamp: {thread['thread_ts']}")
             print(f"Last message content:\n{thread['messages'][-1]['text']}")
             
-            # Call review_and_remind and capture the raw LLM response
             result, raw_llm_response = llm_interactor.review_and_remind(thread, return_raw_response=True)
             
             print(f"\nRaw LLM Response:\n{raw_llm_response}")
@@ -48,8 +46,6 @@ def process_threads(interactor: SlackInteractor, llm_interactor: LLMInteractor, 
                 if result['reminders'] != "No reminders needed at this time.":
                     print(f"Thread inactive for {time_since_last_activity}. Reminder content:")
                     print(result['reminders'])
-                    # Uncomment the next line when you want to actually post reminders
-                    # interactor.post_thread_reply(thread, result['reminders'])
                     thread_result['reminder_sent'] = True
                 else:
                     print("No open items to remind about in this thread.")
@@ -79,8 +75,6 @@ def main():
 
             results = process_threads(interactor, llm_interactor, threads)
             
-            # Here you could do something with the results, like logging or further processing
-
             time.sleep(SLEEP_PERIOD)
 
         except KeyboardInterrupt:
@@ -89,8 +83,8 @@ def main():
 
         except Exception as e:
             print(f"An error occurred: {e}")
-            print("Waiting for 5 minutes before retrying...")
-            time.sleep(300)
+            print(f"Waiting for {SLEEP_PERIOD} seconds before retrying...")
+            time.sleep(SLEEP_PERIOD)
 
 if __name__ == "__main__":
     main()

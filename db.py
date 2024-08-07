@@ -19,9 +19,9 @@ class ActionItemDatabase:
         with open(self.file_path, 'w') as f:
             json.dump(serializable_items, f, indent=2)
 
-    def add_item(self, thread_id, channel, description, due_minutes=1):
+    def add_item(self, thread_id, channel, description):
         created = pd.Timestamp.now()
-        due = created + pd.Timedelta(minutes=due_minutes)
+        due = created + pd.Timedelta(minutes=1)  # Changed to 1 minute for debugging
         thread_ts = pd.Timestamp(thread_id)
         if thread_ts not in self.action_items:
             self.action_items[thread_ts] = []
@@ -32,7 +32,7 @@ class ActionItemDatabase:
             'due': due.isoformat()
         })
         self.save_items()
-        print(f"Debug - Added item due in {due_minutes} minutes: {description}")
+        print(f"Debug - Added item due at: {due}")  # Added debug print
 
     def get_items(self, thread_id):
         thread_ts = pd.Timestamp(thread_id)
@@ -44,6 +44,14 @@ class ActionItemDatabase:
             self.action_items[thread_ts] = [item for item in self.action_items[thread_ts] if item['description'] != description]
             if not self.action_items[thread_ts]:
                 del self.action_items[thread_ts]
+            self.save_items()
+            return True
+        return False
+
+    def delete_thread_items(self, thread_id):
+        thread_ts = pd.Timestamp(thread_id)
+        if thread_ts in self.action_items:
+            del self.action_items[thread_ts]
             self.save_items()
             return True
         return False

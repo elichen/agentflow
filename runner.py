@@ -45,6 +45,14 @@ def check_and_post_reminders(interactor: SlackInteractor, llm_interactor: LLMInt
         if thread:
             interactor.post_thread_reply(thread, reminder)
             print(f"Posted reminder for item: {item['description']} in thread: {thread_id}")
+            
+            # Delete all action items for this thread
+            llm_interactor.action_db.delete_thread_items(thread_id)
+            print(f"Deleted all action items for thread: {thread_id}")
+            
+            # Add this thread to be reprocessed in the next iteration
+            # Note: This assumes that fetch_new_messages will include threads with new bot messages
+            # If not, you may need to modify fetch_new_messages to include these threads
         else:
             print(f"Could not fetch thread {thread_id} for reminder")
 

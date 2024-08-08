@@ -1,12 +1,13 @@
 import json
 import pandas as pd
+from typing import List, Dict, Any, Tuple
 
-class ActionItemDatabase:
-    def __init__(self, file_path='action_items.json'):
+class ActionDatabase:
+    def __init__(self, file_path='actions.json'):
         self.file_path = file_path
-        self.action_items = self.load_items()
+        self.actions = self.load_actions()
 
-    def load_items(self):
+    def load_actions(self) -> Dict[str, List[Dict[str, Any]]]:
         try:
             with open(self.file_path, 'r') as f:
                 data = json.load(f)
@@ -14,56 +15,42 @@ class ActionItemDatabase:
         except FileNotFoundError:
             return {}
 
-    def save_items(self):
-        serializable_items = {str(k): v for k, v in self.action_items.items()}
+    def save_actions(self):
+        serializable_actions = {str(k): v for k, v in self.actions.items()}
         with open(self.file_path, 'w') as f:
-            json.dump(serializable_items, f, indent=2)
+            json.dump(serializable_actions, f, indent=2)
 
-    def add_item(self, thread_id, channel, description):
-        created = pd.Timestamp.now()
-        due = created + pd.Timedelta(minutes=1)  # Changed to 1 minute for debugging
-        thread_ts = pd.Timestamp(thread_id)
-        if thread_ts not in self.action_items:
-            self.action_items[thread_ts] = []
-        self.action_items[thread_ts].append({
-            'channel': channel,
-            'description': description,
-            'created': created.isoformat(),
-            'due': due.isoformat()
-        })
-        self.save_items()
-        print(f"Debug - Added item due at: {due}")  # Added debug print
+    def add_action(self, thread_id: str, channel: str, description: str, execution_time: pd.Timestamp):
+        action = {
+            "channel": channel,
+            "description": description,
+            "execution_time": execution_time.isoformat()
+        }
+        if thread_id not in self.actions:
+            self.actions[thread_id] = []
+        self.actions[thread_id].append(action)
+        self.save_actions()
+        print(f"Debug - Added action due at: {execution_time}")
 
-    def get_items(self, thread_id):
-        thread_ts = pd.Timestamp(thread_id)
-        return self.action_items.get(thread_ts, [])
+    def get_actions(self, thread_id: str) -> List[Dict[str, Any]]:
+        return self.actions.get(thread_id, [])
 
-    def delete_item(self, thread_id, description):
-        thread_ts = pd.Timestamp(thread_id)
-        if thread_ts in self.action_items:
-            self.action_items[thread_ts] = [item for item in self.action_items[thread_ts] if item['description'] != description]
-            if not self.action_items[thread_ts]:
-                del self.action_items[thread_ts]
-            self.save_items()
+    def remove_action(self, thread_id: str, description: str):
+        if thread_id in self.actions:
+            self.actions[thread_id] = [action for action in self.actions[thread_id] if action['description'] != description]
+            if not self.actions[thread_id]:
+                del self.actions[thread_id]
+            self.save_actions()
             return True
         return False
 
-    def delete_thread_items(self, thread_id):
-        thread_ts = pd.Timestamp(thread_id)
-        if thread_ts in self.action_items:
-            del self.action_items[thread_ts]
-            self.save_items()
-            return True
-        return False
+    def get_due_actions(self, current_time: pd.Timestamp) -> List[Tuple[str, Dict[str, Any]]]:
+        due_actions = []
+        for thread_id, actions in self.actions.items():
+            for action in actions:
+                if pd.Timestamp(action['execution_time']) <= current_time:
+                    due_actions.append((thread_id, action))
+        return due_actions
 
-    def get_all_thread_ids(self):
-        return [str(thread_id) for thread_id in self.action_items.keys()]
-
-    def get_due_items(self):
-        now = pd.Timestamp.now()
-        due_items = []
-        for thread_id, items in self.action_items.items():
-            for item in items:
-                if pd.Timestamp(item['due']) <= now:
-                    due_items.append((thread_id, item))
-        return due_items
+    def get_all_thread_ids(self) -> List[str]:
+        return list(self.actions.keys())

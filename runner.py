@@ -5,7 +5,7 @@ from llm import LLMInteractor
 import pandas as pd
 from typing import List, Dict, Any
 
-SLEEP_PERIOD = 300
+SLEEP_PERIOD = 60  # 1 minute for more frequent checks
 
 def process_threads(interactor: SlackInteractor, llm_interactor: LLMInteractor, threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     results = []
@@ -23,13 +23,13 @@ def process_threads(interactor: SlackInteractor, llm_interactor: LLMInteractor, 
         thread_result = {
             'channel': thread['channel'],
             'thread_ts': thread['thread_ts'],
-            'new_items': result['new_items'],
+            'new_actions': result['new_actions'],
         }
         
-        if result['new_items']:
-            print(f"\nNew action items identified: {', '.join(result['new_items'])}")
+        if result['new_actions']:
+            print(f"\nNew actions identified: {', '.join(result['new_actions'])}")
         else:
-            print("\nNo new action items identified.")
+            print("\nNo new actions identified.")
         
         results.append(thread_result)
         
@@ -37,24 +37,25 @@ def process_threads(interactor: SlackInteractor, llm_interactor: LLMInteractor, 
     
     return results
 
-def check_and_post_reminders(interactor: SlackInteractor, llm_interactor: LLMInteractor):
-    due_items = llm_interactor.action_db.get_due_items()
-    for thread_id, item in due_items:
-        reminder = llm_interactor.generate_reminder(thread_id, item)
+def execute_due_actions(interactor: SlackInteractor, llm_interactor: LLMInteractor):
+    current_time = pd.Timestamp.now()
+    due_actions = llm_interactor.action_db.get_due_actions(current_time)
+    for thread_id, action in due_actions:
+        print(f"\nExecuting action for thread: {thread_id}")
+        print(f"Action: {action['description']}")
+        
+        response = llm_interactor.generate_action_response(thread_id, action)
+        print(f"Generated response:\n{response}")
+        
         thread = interactor.fetch_thread(thread_id)
         if thread:
-            interactor.post_thread_reply(thread, reminder)
-            print(f"Posted reminder for item: {item['description']} in thread: {thread_id}")
+            interactor.post_thread_reply(thread, response)
+            print(f"Posted response in thread: {thread_id}")
             
-            # Delete all action items for this thread
-            llm_interactor.action_db.delete_thread_items(thread_id)
-            print(f"Deleted all action items for thread: {thread_id}")
-            
-            # Add this thread to be reprocessed in the next iteration
-            # Note: This assumes that fetch_new_messages will include threads with new bot messages
-            # If not, you may need to modify fetch_new_messages to include these threads
+            llm_interactor.action_db.remove_action(thread_id, action['description'])
+            print(f"Removed executed action from database")
         else:
-            print(f"Could not fetch thread {thread_id} for reminder")
+            print(f"Could not fetch thread {thread_id} for action execution")
 
 def main():
     interactor = SlackInteractor()
@@ -71,8 +72,8 @@ def main():
 
             results = process_threads(interactor, llm_interactor, threads)
             
-            print("\nChecking for due items and posting reminders...")
-            check_and_post_reminders(interactor, llm_interactor)
+            print("\nChecking for due actions...")
+            execute_due_actions(interactor, llm_interactor)
             
             time.sleep(SLEEP_PERIOD)
 

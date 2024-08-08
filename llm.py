@@ -3,27 +3,26 @@ import json
 import re
 from typing import Dict, List, Any, Tuple
 import anthropic
-from db import ActionItemDatabase
+from db import ActionDatabase
 import pandas as pd
 
 class LLMInteractor:
     def __init__(self):
         self.client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
         self.model = "claude-3-opus-20240229"
-        self.action_db = ActionItemDatabase()
+        self.action_db = ActionDatabase()
 
     def process_thread(self, thread: Dict[str, Any], return_raw_response: bool = False) -> Dict[str, Any]:
         conversation = self._format_thread(thread)
         thread_id = thread['thread_ts']
         channel = thread['channel']
-        raw_response = self._get_llm_response(self._generate_review_prompt(conversation))
+        raw_response = self._get_llm_response(self._generate_action_prompt(conversation))
         
-        action_items = self._extract_action_items_from_response(raw_response)
-
-        new_items = self._process_action_items(thread_id, channel, action_items)
+        actions = self._extract_actions_from_response(raw_response)
+        new_actions = self._process_actions(thread_id, channel, actions)
 
         result = {
-            'new_items': new_items,
+            'new_actions': new_actions,
         }
 
         if return_raw_response:
@@ -31,72 +30,79 @@ class LLMInteractor:
         else:
             return result
 
-    def _generate_review_prompt(self, conversation: str) -> str:
+    def _generate_action_prompt(self, conversation: str) -> str:
         return f"""
         Analyze the following conversation and provide a JSON response with the following structure:
         {{
-            "action_items": [
-                {{
-                    "description": "Brief description of the action item",
-                    "assignee": "Name of the person assigned (if specified), or 'Unassigned'"
-                }}
-            ]
+            "action": {{
+                "description": "Brief description of the single most important action to take",
+                "execution_time": "Time to execute the action (e.g., '5 minutes', '1 hour', '1 day')"
+            }}
         }}
-        Include in "action_items" only tasks or actions that are not resolved within the conversation.
-        If no unresolved action items are found, return an empty array.
+        Include only one action that is the most critical or time-sensitive based on the conversation.
+        If no action is needed, return an empty object for "action".
         Provide only the JSON response without any additional text or explanation.
         Conversation:
         {conversation}
         JSON response:
         """
 
-    def _extract_action_items_from_response(self, raw_response: str) -> List[Dict[str, str]]:
+    def _extract_actions_from_response(self, raw_response: str) -> List[Dict[str, str]]:
         try:
-            # Try to extract JSON from the response
             json_match = re.search(r'\{[\s\S]*\}', raw_response)
             if json_match:
                 json_str = json_match.group(0)
                 parsed_response = json.loads(json_str)
-                return parsed_response.get('action_items', [])
+                action = parsed_response.get('action')
+                return [action] if action else []
             else:
                 raise ValueError("No JSON found in the response")
         except (json.JSONDecodeError, ValueError) as e:
             print(f"Error parsing JSON: {e}")
             print(f"Raw response:\n{raw_response}")
-            # Fallback to extracting action items manually
-            return self._extract_action_items(raw_response)
+            return []
 
-    def _process_action_items(self, thread_id: str, channel: str, action_items: List[Dict[str, str]]) -> List[str]:
-        existing_items = self.action_db.get_items(thread_id)
-        for item in existing_items:
-            self.action_db.delete_item(thread_id, item['description'])
+    def _process_actions(self, thread_id: str, channel: str, actions: List[Dict[str, str]]) -> List[str]:
+        new_actions = []
+        for action in actions:
+            description = action['description']
+            execution_time = self._parse_execution_time(action['execution_time'])
+            self.action_db.add_action(thread_id, channel, description, execution_time)
+            new_actions.append(f"{description} (Execute at: {execution_time})")
         
-        new_items = []
-        for item in action_items:
-            description = item['description']
-            assignee = item['assignee']
-            action_item = f"{description} (Assignee: {assignee})"
-            print(f"Debug - Adding new item: {action_item}")
-            self.action_db.add_item(thread_id, channel, action_item)
-            new_items.append(action_item)
-        
-        print(f"Debug - Total new items identified: {len(new_items)}")
-        return new_items
+        print(f"Debug - Total new actions identified: {len(new_actions)}")
+        return new_actions
 
-    def generate_reminder(self, thread_id: str, item: Dict[str, Any]) -> str:
-        reminder_prompt = f"""
-        Generate a friendly reminder for the following open action item. The reminder should be in the style of a casual Slack message:
+    def _parse_execution_time(self, time_str: str) -> pd.Timestamp:
+        now = pd.Timestamp.now()
+        if 'minute' in time_str:
+            minutes = int(time_str.split()[0])
+            return now + pd.Timedelta(minutes=minutes)
+        elif 'hour' in time_str:
+            hours = int(time_str.split()[0])
+            return now + pd.Timedelta(hours=hours)
+        elif 'day' in time_str:
+            days = int(time_str.split()[0])
+            return now + pd.Timedelta(days=days)
+        else:
+            # Default to 1 hour if parsing fails
+            print(f"Warning: Could not parse execution time '{time_str}'. Defaulting to 1 hour.")
+            return now + pd.Timedelta(hours=1)
+
+    def generate_action_response(self, thread_id: str, action: Dict[str, Any]) -> str:
+        action_prompt = f"""
+        Generate a response for the following action in a Slack conversation:
         - Keep it brief and to the point
         - Use a conversational tone
         - Don't use a formal letter structure or signature
         - Include an emoji or two if appropriate
-        - Directly address the action item without unnecessary formalities
+        - Directly address the action without unnecessary formalities
 
-        Action item: {item['description']}
+        Action: {action['description']}
 
-        Slack reminder message:
+        Slack message:
         """
-        return self._get_llm_response(reminder_prompt)
+        return self._get_llm_response(action_prompt)
 
     def _get_llm_response(self, prompt: str) -> str:
         try:
@@ -118,14 +124,3 @@ class LLMInteractor:
             user_type = "Human" if not message['is_bot'] else "AI"
             formatted_messages.append(f"{user_type} ({message['minutes_ago']} minutes ago): {message['text']}")
         return "\n".join(formatted_messages)
-
-    def _extract_action_items(self, raw_response: str) -> List[Dict[str, str]]:
-        action_items = []
-        for line in raw_response.split('\n'):
-            if "description" in line.lower() and "assignee" in line.lower():
-                parts = line.split(',')
-                if len(parts) >= 2:
-                    description = parts[0].split(':')[-1].strip().strip('"')
-                    assignee = parts[1].split(':')[-1].strip().strip('"')
-                    action_items.append({"description": description, "assignee": assignee})
-        return action_items

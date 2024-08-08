@@ -85,9 +85,16 @@ class LLMInteractor:
 
     def generate_reminder(self, thread_id: str, item: Dict[str, Any]) -> str:
         reminder_prompt = f"""
-        Generate a friendly reminder for the following open action item. The reminder should encourage action without being pushy or nagging:
-        {item['description']}
-        Reminder:
+        Generate a friendly reminder for the following open action item. The reminder should be in the style of a casual Slack message:
+        - Keep it brief and to the point
+        - Use a conversational tone
+        - Don't use a formal letter structure or signature
+        - Include an emoji or two if appropriate
+        - Directly address the action item without unnecessary formalities
+
+        Action item: {item['description']}
+
+        Slack reminder message:
         """
         return self._get_llm_response(reminder_prompt)
 

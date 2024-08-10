@@ -27,9 +27,10 @@ def process_threads(interactor: SlackInteractor, llm_interactor: LLMInteractor, 
         }
         
         if result['new_actions']:
-            print(f"\nNew actions identified: {', '.join(result['new_actions'])}")
+            for action in result['new_actions']:
+                print(f"\nNew action identified: {action}")
         else:
-            print("\nNo new actions identified.")
+            print("\nNo new actions needed.")
         
         results.append(thread_result)
         

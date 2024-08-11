@@ -7,10 +7,11 @@ from db import ActionDatabase
 import pandas as pd
 
 class LLMInteractor:
-    def __init__(self):
+    def __init__(self, slack_interactor):
         self.client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
         self.model = "claude-3-opus-20240229"
         self.action_db = ActionDatabase()
+        self.slack_interactor = slack_interactor
 
     def process_thread(self, thread: Dict[str, Any], return_raw_response: bool = False) -> Dict[str, Any]:
         conversation = self._format_thread(thread)
@@ -19,9 +20,24 @@ class LLMInteractor:
         raw_response = self._get_llm_response(self._generate_action_prompt(conversation))
         
         actions = self._extract_actions_from_response(raw_response)
-        new_actions = self._process_actions(thread_id, channel, actions)
+        
+        immediate_action = next((action for action in actions if action['type'] == 'immediate'), None)
+        check_in_action = next((action for action in actions if action['type'] == 'check_in'), None)
+        
+        executed_actions = []
+        new_actions = []
+
+        if immediate_action:
+            executed_actions.append(self._execute_immediate_action(thread, immediate_action))
+        
+        if check_in_action:
+            execution_time = self._parse_execution_time(check_in_action['execution_time'])
+            action_description = f"Check-in: {check_in_action['description']}"
+            self.action_db.add_action(thread_id, channel, action_description, execution_time)
+            new_actions.append(f"{action_description} (Execute at: {execution_time})")
 
         result = {
+            'executed_actions': executed_actions,
             'new_actions': new_actions,
         }
 
@@ -29,6 +45,11 @@ class LLMInteractor:
             return result, raw_response
         else:
             return result
+
+    def _execute_immediate_action(self, thread: Dict[str, Any], action: Dict[str, Any]) -> str:
+        response = self.generate_action_response(thread['thread_ts'], action)
+        self.slack_interactor.post_thread_reply(thread, response)
+        return f"Executed immediate action: {action['description']}"
 
     def _generate_action_prompt(self, conversation: str) -> str:
         return f"""
@@ -92,17 +113,6 @@ class LLMInteractor:
             print(f"Error parsing JSON: {e}")
             print(f"Raw response:\n{raw_response}")
             return []
-
-    def _process_actions(self, thread_id: str, channel: str, actions: List[Dict[str, Any]]) -> List[str]:
-        new_actions = []
-        for action in actions:
-            execution_time = self._parse_execution_time(action['execution_time'])
-            action_description = f"{action['type'].capitalize()}: {action['description']}"
-            self.action_db.add_action(thread_id, channel, action_description, execution_time)
-            new_actions.append(f"{action_description} (Execute at: {execution_time})")
-        
-        print(f"Debug - Total new actions identified: {len(new_actions)}")
-        return new_actions
 
     def _parse_execution_time(self, time_str: str) -> pd.Timestamp:
         now = pd.Timestamp.now()

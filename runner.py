@@ -23,14 +23,20 @@ def process_threads(interactor: SlackInteractor, llm_interactor: LLMInteractor, 
         thread_result = {
             'channel': thread['channel'],
             'thread_ts': thread['thread_ts'],
+            'executed_actions': result['executed_actions'],
             'new_actions': result['new_actions'],
         }
         
+        if result['executed_actions']:
+            for action in result['executed_actions']:
+                print(f"\nExecuted action: {action}")
+        
         if result['new_actions']:
             for action in result['new_actions']:
-                print(f"\nNew action identified: {action}")
-        else:
-            print("\nNo new actions needed.")
+                print(f"\nNew action scheduled: {action}")
+        
+        if not result['executed_actions'] and not result['new_actions']:
+            print("\nNo actions needed.")
         
         results.append(thread_result)
         
@@ -45,11 +51,9 @@ def execute_due_actions(interactor: SlackInteractor, llm_interactor: LLMInteract
         print(f"\nExecuting action for thread: {thread_id}")
         print(f"Action: {action['description']}")
         
-        response = llm_interactor.generate_action_response(thread_id, action)
-        print(f"Generated response:\n{response}")
-        
         thread = interactor.fetch_thread(thread_id)
         if thread:
+            response = llm_interactor.generate_action_response(thread_id, action)
             interactor.post_thread_reply(thread, response)
             print(f"Posted response in thread: {thread_id}")
             
@@ -60,7 +64,7 @@ def execute_due_actions(interactor: SlackInteractor, llm_interactor: LLMInteract
 
 def main():
     interactor = SlackInteractor()
-    llm_interactor = LLMInteractor()
+    llm_interactor = LLMInteractor(interactor)
 
     print("Slack Bot Runner started. Press Ctrl+C to stop.")
 

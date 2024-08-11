@@ -1,3 +1,4 @@
 complete_conversations.pkl
 __pycache__
 .ipynb_checkpoints
+actions.json

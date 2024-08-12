@@ -9,5 +9,5 @@ ANTHROPIC_API_KEY
 ```
 # Running
 ```
-python runner.py
+run.sh
 ```

@@ -19,10 +19,14 @@ class LLMInteractor:
         channel = thread['channel']
         raw_response = self._get_llm_response(self._generate_action_prompt(conversation))
         
+        print(f"Debug: Raw LLM response:\n{raw_response}")  # Debug output
+        
         actions = self._extract_actions_from_response(raw_response)
         
+        print(f"Debug: Extracted actions: {actions}")  # Debug output
+        
         immediate_action = next((action for action in actions if action['type'] == 'immediate'), None)
-        check_in_action = next((action for action in actions if action['type'] == 'check_in'), None)
+        delayed_action = next((action for action in actions if action['type'] == 'delayed'), None)
         
         executed_actions = []
         new_actions = []
@@ -30,9 +34,10 @@ class LLMInteractor:
         if immediate_action:
             executed_actions.append(self._execute_immediate_action(thread, immediate_action))
         
-        if check_in_action:
-            execution_time = self._parse_execution_time(check_in_action['execution_time'])
-            action_description = f"Check-in: {check_in_action['description']}"
+        if delayed_action:
+            print(f"Debug: Processing delayed action: {delayed_action}")  # Debug output
+            execution_time = self._parse_execution_time(delayed_action['execution_time'])
+            action_description = f"Delayed task: {delayed_action['description']}"
             self.action_db.add_action(thread_id, channel, action_description, execution_time)
             new_actions.append(f"{action_description} (Execute at: {execution_time})")
 
@@ -53,31 +58,31 @@ class LLMInteractor:
 
     def _generate_action_prompt(self, conversation: str) -> str:
         return f"""
-        Analyze the following conversation carefully. Consider the entire thread history when making decisions. Determine if any immediate action is needed or if a check-in should be scheduled. Consider the following:
+        Analyze the following conversation carefully. Consider the entire thread history when making decisions. Determine if any immediate action is needed or if a delayed task should be scheduled. Consider the following:
 
         1. Immediate actions: Tasks that need to be done right away based on direct messages to the bot 'agentflow'.
-        2. Check-ins: For requests or tasks assigned to specific team members or broadly to the team that haven't been fully addressed or resolved.
+        2. Delayed tasks: Any task that needs to be performed in the future, including check-ins, reminders, or scheduled actions.
 
         Provide a JSON response with the following structure:
         {{
             "immediate_action": {{
                 "needed": boolean,
                 "description": "Description of the immediate action for agentflow (if needed)",
-                "execution_time": "Time to execute the action (e.g., '5 minutes', '1 hour')"
+                "execution_time": "Immediately"
             }},
-            "check_in": {{
+            "delayed_action": {{
                 "needed": boolean,
-                "description": "Description of what to check or follow up on",
-                "execution_time": "When to perform the check-in (e.g., '2 hours', '1 day')"
+                "description": "Description of the delayed task, including check-ins or scheduled actions",
+                "execution_time": "When to perform the task (e.g., '5 minutes', '2 hours', '1 day', '9am tomorrow')"
             }}
         }}
 
         Guidelines:
         1. Consider the entire conversation history when making decisions.
-        2. Immediate actions are only for direct requests to 'agentflow'.
-        3. For team tasks or requests, suggest a check-in only if the matter hasn't been fully resolved or addressed.
-        4. Choose appropriate check-in times based on the urgency and context of the conversation.
-        5. If no action or check-in is needed (e.g., the matter has been resolved), set both 'needed' fields to false.
+        2. Immediate actions are only for direct requests to 'agentflow' that need to be done right away.
+        3. Use delayed actions for any task that should be performed in the future, including check-ins, reminders, and scheduled tasks.
+        4. Choose appropriate execution times for delayed actions based on the context of the conversation.
+        5. If no action is needed, set both 'needed' fields to false.
 
         Provide only the JSON response without any additional text or explanation.
 
@@ -98,13 +103,13 @@ class LLMInteractor:
                     actions.append({
                         'type': 'immediate',
                         'description': parsed_response['immediate_action']['description'],
-                        'execution_time': parsed_response['immediate_action']['execution_time']
+                        'execution_time': 'Immediately'
                     })
-                if parsed_response.get('check_in', {}).get('needed', False):
+                if parsed_response.get('delayed_action', {}).get('needed', False):
                     actions.append({
-                        'type': 'check_in',
-                        'description': parsed_response['check_in']['description'],
-                        'execution_time': parsed_response['check_in']['execution_time']
+                        'type': 'delayed',
+                        'description': parsed_response['delayed_action']['description'],
+                        'execution_time': parsed_response['delayed_action']['execution_time']
                     })
                 return actions
             else:
@@ -116,6 +121,10 @@ class LLMInteractor:
 
     def _parse_execution_time(self, time_str: str) -> pd.Timestamp:
         now = pd.Timestamp.now()
+        print(f"Debug: Parsing execution time: '{time_str}'")  # Debug output
+        
+        time_str = time_str.lower()
+        
         if 'minute' in time_str:
             minutes = int(time_str.split()[0])
             return now + pd.Timedelta(minutes=minutes)
@@ -125,9 +134,33 @@ class LLMInteractor:
         elif 'day' in time_str:
             days = int(time_str.split()[0])
             return now + pd.Timedelta(days=days)
+        elif 'tomorrow' in time_str:
+            # Handle cases like "9am tomorrow", "tomorrow at 9am", "9:00 tomorrow", etc.
+            time_parts = time_str.replace(',', '').split()
+            print(f"Debug: Time parts: {time_parts}")  # Debug output
+            
+            # Find the time within the string
+            time_index = next((i for i, part in enumerate(time_parts) if ':' in part or 'am' in part or 'pm' in part), None)
+            
+            if time_index is not None:
+                time_part = time_parts[time_index]
+                print(f"Debug: Found time part: {time_part}")  # Debug output
+                
+                if ':' in time_part:
+                    hour, minute = map(int, time_part.replace('am', '').replace('pm', '').split(':'))
+                else:
+                    hour = int(time_part.replace('am', '').replace('pm', ''))
+                    minute = 0
+                
+                if 'pm' in time_part and hour < 12:
+                    hour += 12
+                
+                return (now + pd.Timedelta(days=1)).replace(hour=hour, minute=minute, second=0, microsecond=0)
+            else:
+                print(f"Debug: No specific time found, defaulting to 9am")  # Debug output
+                return (now + pd.Timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
         else:
-            # Default to 1 hour if parsing fails
-            print(f"Warning: Could not parse execution time '{time_str}'. Defaulting to 1 hour.")
+            print(f"Warning: Could not parse execution time '{time_str}'. Defaulting to 1 hour from now.")
             return now + pd.Timedelta(hours=1)
 
     def generate_action_response(self, thread_id: str, action: Dict[str, Any]) -> str:

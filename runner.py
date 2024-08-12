@@ -48,7 +48,7 @@ def execute_due_actions(interactor: SlackInteractor, llm_interactor: LLMInteract
     current_time = pd.Timestamp.now()
     due_actions = llm_interactor.action_db.get_due_actions(current_time)
     for thread_id, action in due_actions:
-        print(f"\nExecuting action for thread: {thread_id}")
+        print(f"\nExecuting delayed action for thread: {thread_id}")
         print(f"Action: {action['description']}")
         
         thread = interactor.fetch_thread(thread_id)

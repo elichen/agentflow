@@ -1,13 +1,17 @@
+# runner.py
+
 import time
 import sys
-from slack import SlackInteractor
-from llm import LLMInteractor
-import pandas as pd
 from typing import List, Dict, Any
+import pandas as pd
+from slack import SlackInteractor
+from claude_llm import ClaudeLLM
+from project_manager_agent import ProjectManagerAgent
+from db import ActionDatabase
 
 SLEEP_PERIOD = 60  # 1 minute for more frequent checks
 
-def process_threads(interactor: SlackInteractor, llm_interactor: LLMInteractor, threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def process_threads(agent: ProjectManagerAgent, threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     results = []
     
     for thread in threads:
@@ -16,26 +20,27 @@ def process_threads(interactor: SlackInteractor, llm_interactor: LLMInteractor, 
         print(f"Thread timestamp: {thread['thread_ts']}")
         print(f"Last message content:\n{thread['messages'][-1]['text']}")
         
-        result, raw_llm_response = llm_interactor.process_thread(thread, return_raw_response=True)
-        
-        print(f"\nRaw LLM Response:\n{raw_llm_response}")
+        agent.read_thread(thread)
+        action_needed, immediate_action, delayed_action = agent.decide_action()
         
         thread_result = {
             'channel': thread['channel'],
             'thread_ts': thread['thread_ts'],
-            'executed_actions': result['executed_actions'],
-            'new_actions': result['new_actions'],
+            'executed_actions': [],
+            'new_actions': [],
         }
         
-        if result['executed_actions']:
-            for action in result['executed_actions']:
-                print(f"\nExecuted action: {action}")
+        if immediate_action:
+            result = agent.execute_immediate_action(immediate_action)
+            thread_result['executed_actions'].append(result)
+            print(f"\nExecuted immediate action: {result}")
         
-        if result['new_actions']:
-            for action in result['new_actions']:
-                print(f"\nNew action scheduled: {action}")
+        if delayed_action:
+            agent.schedule_delayed_action(delayed_action)
+            thread_result['new_actions'].append(f"Scheduled: {delayed_action['description']} (Execute at: {delayed_action['execution_time']})")
+            print(f"\nNew action scheduled: {delayed_action['description']}")
         
-        if not result['executed_actions'] and not result['new_actions']:
+        if not action_needed:
             print("\nNo actions needed.")
         
         results.append(thread_result)
@@ -44,41 +49,44 @@ def process_threads(interactor: SlackInteractor, llm_interactor: LLMInteractor, 
     
     return results
 
-def execute_due_actions(interactor: SlackInteractor, llm_interactor: LLMInteractor):
+def execute_due_actions(agent: ProjectManagerAgent):
     current_time = pd.Timestamp.now()
-    due_actions = llm_interactor.action_db.get_due_actions(current_time)
+    due_actions = agent.action_db.get_due_actions(current_time)
     for thread_id, action in due_actions:
         print(f"\nExecuting delayed action for thread: {thread_id}")
         print(f"Action: {action['description']}")
         
-        thread = interactor.fetch_thread(thread_id)
+        thread = agent.slack_interactor.fetch_thread(thread_id)
         if thread:
-            response = llm_interactor.generate_action_response(thread_id, action)
-            interactor.post_thread_reply(thread, response)
+            agent.read_thread(thread)
+            response = agent._generate_action_response(action)
+            agent.slack_interactor.post_thread_reply(thread, response)
             print(f"Posted response in thread: {thread_id}")
             
-            llm_interactor.action_db.remove_action(thread_id, action['description'])
+            agent.action_db.remove_action(thread_id, action['description'])
             print(f"Removed executed action from database")
         else:
             print(f"Could not fetch thread {thread_id} for action execution")
 
 def main():
-    interactor = SlackInteractor()
-    llm_interactor = LLMInteractor(interactor)
+    slack_interactor = SlackInteractor()
+    llm = ClaudeLLM()
+    action_db = ActionDatabase()
+    agent = ProjectManagerAgent(llm, action_db, slack_interactor)
 
     print("Slack Bot Runner started. Press Ctrl+C to stop.")
 
     while True:
         try:
             print("\nFetching new messages...")
-            data = interactor.fetch_new_messages()
-            threads = interactor.organize_threads(data)
+            data = slack_interactor.fetch_new_messages()
+            threads = slack_interactor.organize_threads(data)
             print(f"Found {len(threads)} threads with new messages.")
 
-            results = process_threads(interactor, llm_interactor, threads)
+            results = process_threads(agent, threads)
             
             print("\nChecking for due actions...")
-            execute_due_actions(interactor, llm_interactor)
+            execute_due_actions(agent)
             
             time.sleep(SLEEP_PERIOD)
 

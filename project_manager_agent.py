@@ -15,6 +15,7 @@ class ProjectManagerAgent(AgentInterface):
         self.action_db = action_db
         self.slack_interactor = slack_interactor
         self.current_thread = None
+        self.username = "PM Agent"
 
     def read_thread(self, thread: Dict[str, Any]) -> None:
         self.current_thread = thread
@@ -40,7 +41,7 @@ class ProjectManagerAgent(AgentInterface):
 
     def execute_immediate_action(self, action: Dict[str, Any]) -> str:
         response = self._generate_action_response(action)
-        self.slack_interactor.post_thread_reply(self.current_thread, response)
+        self.slack_interactor.post_thread_reply(self.current_thread, response, username=self.username)
         return f"Executed immediate action: {action['description']}"
 
     def schedule_delayed_action(self, action: Dict[str, Any]) -> None:

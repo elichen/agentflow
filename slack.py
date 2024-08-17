@@ -255,15 +255,15 @@ class SlackInteractor:
     def save_conversations(self, data: pd.DataFrame, file_path: str) -> None:
         data.to_pickle(file_path)
 
-    def post_message(self, channel: str, text: str) -> Dict[str, Any]:
+    def post_message(self, channel: str, text: str, username: str = None) -> Dict[str, Any]:
         return self.exponential_backoff(
             self.bot_client.chat_postMessage,
             channel=f"#{channel}",
             text=text,
-            as_user='Slackbot'
+            username=username
         )
 
-    def post_thread_reply(self, thread: Dict[str, Any], reply_text: str) -> Dict[str, Any]:
+    def post_thread_reply(self, thread: Dict[str, Any], reply_text: str, username: str = None) -> Dict[str, Any]:
         channel = thread['channel']
         thread_ts = thread['thread_ts']
         slack_ts = self.convert_timestamp(thread_ts, to_slack=True)
@@ -272,7 +272,8 @@ class SlackInteractor:
                 self.bot_client.chat_postMessage,
                 channel=channel,
                 text=reply_text,
-                thread_ts=slack_ts
+                thread_ts=slack_ts,
+                username=username
             )
             print(f"Posted reply to thread {thread_ts} in channel {channel}")
             return result

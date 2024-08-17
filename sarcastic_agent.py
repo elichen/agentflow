@@ -6,14 +6,15 @@ from agent_interface import AgentInterface
 from llm_interface import LLMInterface
 from db import ActionDatabase
 
-class SarcasticMemeAgent(AgentInterface):
+class SarcasticAgent(AgentInterface):
     def __init__(self, llm: LLMInterface, action_db: ActionDatabase, slack_interactor):
         self.llm = llm
         self.action_db = action_db
         self.slack_interactor = slack_interactor
         self.current_thread = None
-        self.meme_cooldown = {}
+        self.sarcasm_cooldown = {}
         self.cooldown_period = pd.Timedelta(hours=1)
+        self.username = "Sarcastic Agent"
 
     def read_thread(self, thread: Dict[str, Any]) -> None:
         self.current_thread = thread
@@ -22,53 +23,22 @@ class SarcasticMemeAgent(AgentInterface):
         if not self.current_thread or not self._should_respond():
             return False, None, None
 
-        meme_opportunity = self._analyze_thread_for_meme_opportunity()
         emotion = self._analyze_thread_for_emotion()
 
-        if meme_opportunity:
-            return True, {"type": "immediate", "action": "meme", "content": self._generate_meme_response()}, None
-        elif emotion:
+        if emotion:
             return True, {"type": "immediate", "action": "sarcasm", "content": self._generate_sarcastic_response(emotion)}, None
 
         return False, None, None
 
     def execute_immediate_action(self, action: Dict[str, Any]) -> str:
         response = action['content']
-        self.slack_interactor.post_thread_reply(self.current_thread, response)
-        if action['action'] == 'meme':
-            self._update_meme_cooldown(self.current_thread['thread_ts'])
+        self.slack_interactor.post_thread_reply(self.current_thread, response, username=self.username)
+        self._update_sarcasm_cooldown(self.current_thread['thread_ts'])
         return f"Executed {action['action']} action: {response[:30]}..."
 
     def schedule_delayed_action(self, action: Dict[str, Any]) -> None:
         # This agent doesn't schedule delayed actions
         pass
-
-    def _analyze_thread_for_meme_opportunity(self) -> bool:
-        prompt = f"""
-        Analyze the following conversation and determine if there's an opportunity to inject a relevant and funny meme.
-        Consider the context, topic, and tone of the conversation. Respond with 'Yes' if there's a good opportunity, or 'No' if not.
-        Be selective and don't suggest a meme for every situation.
-
-        Conversation:
-        {self._format_thread_messages()}
-
-        Is there a good opportunity for a meme? (Yes/No):
-        """
-        response = self.llm.generate_response(prompt)
-        return response.strip().lower() == 'yes'
-
-    def _generate_meme_response(self) -> str:
-        prompt = f"""
-        Based on the following conversation, suggest a relevant and funny meme.
-        Describe the meme in text format, as if you were explaining it to someone.
-        Make sure the meme is appropriate for a professional setting and relates to the conversation topic.
-
-        Conversation:
-        {self._format_thread_messages()}
-
-        Meme description:
-        """
-        return self.llm.generate_response(prompt)
 
     def _analyze_thread_for_emotion(self) -> str:
         prompt = f"""
@@ -104,14 +74,14 @@ class SarcasticMemeAgent(AgentInterface):
 
         # Check meme cooldown
         thread_id = self.current_thread['thread_ts']
-        if thread_id in self.meme_cooldown:
-            if pd.Timestamp.now() - self.meme_cooldown[thread_id] < self.cooldown_period:
+        if thread_id in self.sarcasm_cooldown:
+            if pd.Timestamp.now() - self.sarcasm_cooldown[thread_id] < self.cooldown_period:
                 return False
 
         return True
 
-    def _update_meme_cooldown(self, thread_id: str) -> None:
-        self.meme_cooldown[thread_id] = pd.Timestamp.now()
+    def _update_sarcasm_cooldown(self, thread_id: str) -> None:
+        self.sarcasm_cooldown[thread_id] = pd.Timestamp.now()
 
     def _format_thread_messages(self) -> str:
         formatted_messages = []

@@ -7,11 +7,12 @@ import pandas as pd
 from slack import SlackInteractor
 from claude_llm import ClaudeLLM
 from project_manager_agent import ProjectManagerAgent
+from sarcastic_meme_agent import SarcasticMemeAgent
 from db import ActionDatabase
 
 SLEEP_PERIOD = 60  # 1 minute for more frequent checks
 
-def process_threads(agent: ProjectManagerAgent, threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def process_threads(project_manager: ProjectManagerAgent, sarcastic_meme_agent: SarcasticMemeAgent, threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     results = []
     
     for thread in threads:
@@ -20,8 +21,9 @@ def process_threads(agent: ProjectManagerAgent, threads: List[Dict[str, Any]]) -
         print(f"Thread timestamp: {thread['thread_ts']}")
         print(f"Last message content:\n{thread['messages'][-1]['text']}")
         
-        agent.read_thread(thread)
-        action_needed, immediate_action, delayed_action = agent.decide_action()
+        # Process with ProjectManagerAgent
+        project_manager.read_thread(thread)
+        action_needed, immediate_action, delayed_action = project_manager.decide_action()
         
         thread_result = {
             'channel': thread['channel'],
@@ -31,16 +33,25 @@ def process_threads(agent: ProjectManagerAgent, threads: List[Dict[str, Any]]) -
         }
         
         if immediate_action:
-            result = agent.execute_immediate_action(immediate_action)
+            result = project_manager.execute_immediate_action(immediate_action)
             thread_result['executed_actions'].append(result)
             print(f"\nExecuted immediate action: {result}")
         
         if delayed_action:
-            agent.schedule_delayed_action(delayed_action)
+            project_manager.schedule_delayed_action(delayed_action)
             thread_result['new_actions'].append(f"Scheduled: {delayed_action['description']} (Execute at: {delayed_action['execution_time']})")
             print(f"\nNew action scheduled: {delayed_action['description']}")
         
-        if not action_needed:
+        # Process with SarcasticMemeAgent
+        sarcastic_meme_agent.read_thread(thread)
+        meme_action_needed, meme_immediate_action, _ = sarcastic_meme_agent.decide_action()
+        
+        if meme_action_needed and meme_immediate_action:
+            result = sarcastic_meme_agent.execute_immediate_action(meme_immediate_action)
+            thread_result['executed_actions'].append(result)
+            print(f"\nExecuted sarcastic/meme action: {result}")
+        
+        if not action_needed and not meme_action_needed:
             print("\nNo actions needed.")
         
         results.append(thread_result)
@@ -72,7 +83,8 @@ def main():
     slack_interactor = SlackInteractor()
     llm = ClaudeLLM()
     action_db = ActionDatabase()
-    agent = ProjectManagerAgent(llm, action_db, slack_interactor)
+    project_manager = ProjectManagerAgent(llm, action_db, slack_interactor)
+    sarcastic_meme_agent = SarcasticMemeAgent(llm, action_db, slack_interactor)
 
     print("Slack Bot Runner started. Press Ctrl+C to stop.")
 
@@ -83,10 +95,10 @@ def main():
             threads = slack_interactor.organize_threads(data)
             print(f"Found {len(threads)} threads with new messages.")
 
-            results = process_threads(agent, threads)
+            results = process_threads(project_manager, sarcastic_meme_agent, threads)
             
             print("\nChecking for due actions...")
-            execute_due_actions(agent)
+            execute_due_actions(project_manager)
             
             time.sleep(SLEEP_PERIOD)
 

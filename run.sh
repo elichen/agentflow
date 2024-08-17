@@ -11,5 +11,8 @@ run_script() {
     done
 }
 
+# Remove log.txt if it exists
+rm -f log.txt
+
 # Start the script in the background
 run_script &

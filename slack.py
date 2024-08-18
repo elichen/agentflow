@@ -126,7 +126,8 @@ class SlackInteractor:
                             'user_name': user_name,
                             'text': msg['text'],
                             'is_bot': is_bot,
-                            'minutes_ago': minutes_ago
+                            'minutes_ago': minutes_ago,
+                            'username': msg.get('username', 'Unknown')
                         })
                     return thread_data
             except SlackApiError as e:
@@ -163,7 +164,8 @@ class SlackInteractor:
             out['subtype'] = out.get('subtype', np.nan)
             out['thread_ts'] = out.get('thread_ts', np.nan)
             out['user'] = out.get('user', np.nan)
-            out = out[['type', 'subtype', 'ts', 'user', 'thread_ts', 'text', 'channel_id']]
+            out['username'] = out.get('username', np.nan)
+            out = out[['type', 'subtype', 'ts', 'user', 'thread_ts', 'text', 'channel_id', 'username']]
         return out
 
     def fetch_multi_threads(self, channels: List[str], time_stamps: List[str]) -> pd.DataFrame:
@@ -174,9 +176,9 @@ class SlackInteractor:
                 message['channel_id'] = channel
             all_threads.extend(thread_messages)
         if not all_threads:
-            return pd.DataFrame(columns=['type', 'ts', 'user', 'thread_ts', 'text', 'channel_id'])
+            return pd.DataFrame(columns=['type', 'ts', 'user', 'thread_ts', 'text', 'channel_id', 'username'])
         all_threads_df = pd.DataFrame(all_threads)
-        required_columns = ['type', 'ts', 'user', 'thread_ts', 'text', 'channel_id']
+        required_columns = ['type', 'ts', 'user', 'thread_ts', 'text', 'channel_id', 'username']
         for col in required_columns:
             if col not in all_threads_df.columns:
                 all_threads_df[col] = None
@@ -193,6 +195,7 @@ class SlackInteractor:
         all_channels_convos['text_len'] = all_channels_convos.text_clean.str.len()
         all_channels_convos['ts'] = pd.to_datetime(all_channels_convos.ts, unit='s')
         all_channels_convos['thread_ts'] = pd.to_datetime(all_channels_convos.thread_ts, unit='s')
+        all_channels_convos['username'] = all_channels_convos['username'].fillna(all_channels_convos['user'])
         return all_channels_convos
 
     def set_conversations_oldest(self, old_messages: pd.DataFrame):
@@ -315,7 +318,8 @@ class SlackInteractor:
                         'user': message['user_name'],
                         'text': message['text'],
                         'is_bot': message.get('is_bot', False),
-                        'minutes_ago': minutes_ago
+                        'minutes_ago': minutes_ago,
+                        'username': message.get('username', 'Unknown')
                     })
                     seen_messages.add(message_key)
             organized_threads.append(thread)

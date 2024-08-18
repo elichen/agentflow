@@ -183,10 +183,3 @@ class ProjectManagerAgent(AgentInterface):
 
         Are there any open action items? (Yes/No):
         """
-
-    def _format_thread_messages(self) -> str:
-        formatted_messages = []
-        for message in self.current_thread['messages']:
-            user_type = "Human" if not message.get('is_bot', False) else "AI"
-            formatted_messages.append(f"{user_type} ({message['minutes_ago']} minutes ago): {message['text']}")
-        return "\n".join(formatted_messages)

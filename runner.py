@@ -70,7 +70,7 @@ def execute_due_actions(agent: ProjectManagerAgent):
         if thread:
             agent.read_thread(thread)
             response = agent._generate_action_response(action)
-            agent.slack_interactor.post_thread_reply(thread, response)
+            agent.slack_interactor.post_thread_reply(thread, response, username=agent.username)
             print(f"Posted response in thread: {thread_id}")
             
             agent.action_db.remove_action(thread_id, action['description'])

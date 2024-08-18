@@ -50,3 +50,16 @@ class AgentInterface(ABC):
             action (Dict[str, Any]): The action to be scheduled.
         """
         pass
+    
+    def _format_thread_messages(self) -> str:
+        if not hasattr(self, 'current_thread') or self.current_thread is None:
+            return ""
+        formatted_messages = []
+        for message in self.current_thread['messages']:
+            print(f"XXX message: {message}")
+            if message.get('is_bot', False):
+                user_type = f"AI {message['username']}"
+            else:
+                user_type = "Human"
+            formatted_messages.append(f"{user_type} ({message['minutes_ago']} minutes ago): {message['text']}")
+        return "\n".join(formatted_messages)    

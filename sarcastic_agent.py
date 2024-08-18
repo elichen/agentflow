@@ -50,6 +50,7 @@ class SarcasticAgent(AgentInterface):
 
         Prevalent emotion:
         """
+        print(f"XXX prompt XXX\n{prompt}")
         return self.llm.generate_response(prompt).strip().lower()
 
     def _generate_sarcastic_response(self, emotion: str) -> str:
@@ -64,6 +65,7 @@ class SarcasticAgent(AgentInterface):
 
         Sarcastic response:
         """
+#         print(f"XXX prompt: {prompt}")
         return self.llm.generate_response(prompt)
 
     def _should_respond(self) -> bool:
@@ -82,10 +84,3 @@ class SarcasticAgent(AgentInterface):
 
     def _update_sarcasm_cooldown(self, thread_id: str) -> None:
         self.sarcasm_cooldown[thread_id] = pd.Timestamp.now()
-
-    def _format_thread_messages(self) -> str:
-        formatted_messages = []
-        for message in self.current_thread['messages']:
-            user_type = "Human" if not message.get('is_bot', False) else "AI"
-            formatted_messages.append(f"{user_type} ({message['minutes_ago']} minutes ago): {message['text']}")
-        return "\n".join(formatted_messages)

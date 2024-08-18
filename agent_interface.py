@@ -56,7 +56,6 @@ class AgentInterface(ABC):
             return ""
         formatted_messages = []
         for message in self.current_thread['messages']:
-            print(f"XXX message: {message}")
             if message.get('is_bot', False):
                 user_type = f"AI {message['username']}"
             else:

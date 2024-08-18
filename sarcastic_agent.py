@@ -50,7 +50,7 @@ class SarcasticAgent(AgentInterface):
 
         Prevalent emotion:
         """
-        print(f"XXX prompt XXX\n{prompt}")
+#         print(f"XXX _analyze_thread_for_emotion\n{prompt}")
         return self.llm.generate_response(prompt).strip().lower()
 
     def _generate_sarcastic_response(self, emotion: str) -> str:
@@ -65,7 +65,7 @@ class SarcasticAgent(AgentInterface):
 
         Sarcastic response:
         """
-#         print(f"XXX prompt: {prompt}")
+#         print(f"XXX _generate_sarcastic_response:\n{prompt}")
         return self.llm.generate_response(prompt)
 
     def _should_respond(self) -> bool:

@@ -18,6 +18,7 @@ class ClaudeLLM(LLMInterface):
                     {"role": "user", "content": prompt}
                 ]
             )
+            print(f"XXX ClaudeLLM prompt:\n{prompt}\nresponse:\n{response}")
             return response.content[0].text.strip()
         except Exception as e:
             print(f"Error generating response: {e}")

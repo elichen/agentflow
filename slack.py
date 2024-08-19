@@ -10,7 +10,7 @@ from slack_sdk.errors import SlackApiError
 from tqdm import tqdm
 
 class SlackInteractor:
-    def __init__(self, user_token: str = None, bot_token: str = None, max_retries: int = 5, base_delay: float = 1):
+    def __init__(self, user_token: str = None, bot_token: str = None, max_retries: int = 10, base_delay: float = 1):
         self.user_token = user_token or os.environ.get('SLACK_USER_TOKEN')
         self.bot_token = bot_token or os.environ.get('SLACK_BOT_TOKEN')
         self.user_client = WebClient(token=self.user_token)

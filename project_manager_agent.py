@@ -21,10 +21,12 @@ class ProjectManagerAgent(AgentInterface):
         self.current_thread = thread
 
     def decide_action(self) -> Tuple[bool, Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
-        if not self.current_thread or not self._should_respond():
+        if not self.current_thread:
             return False, None, None
 
-        actions = self._generate_actions()
+        prompt = self._generate_prompt()
+        llm_response = self.llm.generate_response(prompt)
+        actions = self._extract_actions_from_response(llm_response)
 
         immediate_action = next((action for action in actions if action['type'] == 'immediate'), None)
         delayed_action = next((action for action in actions if action['type'] == 'delayed'), None)
@@ -53,55 +55,33 @@ class ProjectManagerAgent(AgentInterface):
         response = self.llm.generate_response(prompt)
         return 'yes' in response.lower()
 
-    def _should_respond(self) -> bool:
-        # Check if the last message is from a bot, AI, or agent
-        last_message = self.current_thread['messages'][-1]
-        if last_message.get('is_bot', False) or last_message.get('username', '') == self.username:
-            return False
+    def _generate_prompt(self) -> str:
+        formatted_messages = self._format_thread_messages()
+        return f"""
+        Analyze the following conversation carefully. Consider the entire thread history when making decisions. Determine if any immediate action is needed or if a delayed task should be scheduled. Consider the following:
 
-        # Check if the last message is a direct action or request
-        last_message_text = last_message['text'].lower()
-        if "agentflow" not in last_message_text or not any(word in last_message_text for word in ["can you", "could you", "please"]):
-            return False
-
-        return True
-
-    def _generate_actions(self) -> List[Dict[str, Any]]:
-        prompt = f"""
-        Analyze the following conversation and determine if any immediate action is needed or if a delayed task should be scheduled. Consider the entire thread history when making decisions.
-
-        Your username in this thread is "{self.username}". Avoid responding to messages from other bots, AIs, agents, or yourself.
-
-        Guidelines for actions:
         1. Immediate actions: Tasks that need to be done right away based on direct messages to the bot 'agentflow'.
         2. Delayed tasks: Any task that needs to be performed in the future, including check-ins, reminders, or scheduled actions.
-        3. Be concise and straightforward in your action descriptions.
-        4. Do not include any explanatory text or meta-commentary about the actions.
-        5. Focus on actionable items and project management tasks.
 
         Provide a JSON response with the following structure:
         {{
-            "actions": [
-                {{
-                    "type": "immediate",
-                    "description": "Description of the immediate action",
-                    "execution_time": "Immediately"
-                }},
-                {{
-                    "type": "delayed",
-                    "description": "Description of the delayed task",
-                    "execution_time": "When to perform the task (e.g., '5 minutes', '2 hours', '1 day', '9am tomorrow')"
-                }}
-            ]
+            "immediate_action": {{
+                "needed": boolean,
+                "description": "Description of the immediate action for agentflow (if needed)",
+                "execution_time": "Immediately"
+            }},
+            "delayed_action": {{
+                "needed": boolean,
+                "description": "Description of the delayed task, including check-ins or scheduled actions",
+                "execution_time": "When to perform the task (e.g., '5 minutes', '2 hours', '1 day', '9am tomorrow')"
+            }}
         }}
 
         Conversation:
-        {self._format_thread_messages()}
+        {formatted_messages}
 
         JSON response:
         """
-        llm_response = self.llm.generate_response(prompt)
-        return self._extract_actions_from_response(llm_response)
 
     def _extract_actions_from_response(self, raw_response: str) -> List[Dict[str, Any]]:
         try:
@@ -109,7 +89,20 @@ class ProjectManagerAgent(AgentInterface):
             if json_match:
                 json_str = json_match.group(0)
                 parsed_response = json.loads(json_str)
-                return parsed_response.get('actions', [])
+                actions = []
+                if parsed_response.get('immediate_action', {}).get('needed', False):
+                    actions.append({
+                        'type': 'immediate',
+                        'description': parsed_response['immediate_action']['description'],
+                        'execution_time': 'Immediately'
+                    })
+                if parsed_response.get('delayed_action', {}).get('needed', False):
+                    actions.append({
+                        'type': 'delayed',
+                        'description': parsed_response['delayed_action']['description'],
+                        'execution_time': parsed_response['delayed_action']['execution_time']
+                    })
+                return actions
             else:
                 raise ValueError("No JSON found in the response")
         except (json.JSONDecodeError, ValueError) as e:
@@ -140,8 +133,44 @@ class ProjectManagerAgent(AgentInterface):
         return self.llm.generate_response(prompt)
 
     def _parse_execution_time(self, time_str: str) -> pd.Timestamp:
-        # (existing _parse_execution_time method remains unchanged)
-        pass
+        now = pd.Timestamp.now()
+        time_str = time_str.lower()
+        
+        try:
+            # First, try to parse as an ISO format date-time string
+            return pd.Timestamp(dateutil.parser.isoparse(time_str))
+        except ValueError:
+            # If it's not an ISO format, proceed with the existing logic
+            if 'minute' in time_str:
+                minutes = int(time_str.split()[0])
+                return now + pd.Timedelta(minutes=minutes)
+            elif 'hour' in time_str:
+                hours = int(time_str.split()[0])
+                return now + pd.Timedelta(hours=hours)
+            elif 'day' in time_str:
+                days = int(time_str.split()[0])
+                return now + pd.Timedelta(days=days)
+            elif 'tomorrow' in time_str:
+                time_parts = time_str.replace(',', '').split()
+                time_index = next((i for i, part in enumerate(time_parts) if ':' in part or 'am' in part or 'pm' in part), None)
+                
+                if time_index is not None:
+                    time_part = time_parts[time_index]
+                    if ':' in time_part:
+                        hour, minute = map(int, time_part.replace('am', '').replace('pm', '').split(':'))
+                    else:
+                        hour = int(time_part.replace('am', '').replace('pm', ''))
+                        minute = 0
+                    
+                    if 'pm' in time_part and hour < 12:
+                        hour += 12
+                    
+                    return (now + pd.Timedelta(days=1)).replace(hour=hour, minute=minute, second=0, microsecond=0)
+                else:
+                    return (now + pd.Timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+            else:
+                print(f"Warning: Could not parse execution time '{time_str}'. Defaulting to 1 hour from now.")
+                return now + pd.Timedelta(hours=1)
 
     def _generate_open_items_prompt(self, thread: Dict[str, Any]) -> str:
         formatted_messages = self._format_thread_messages()
@@ -155,14 +184,5 @@ class ProjectManagerAgent(AgentInterface):
         Are there any open action items? (Yes/No):
         """
 
-    def _format_thread_messages(self) -> str:
-        if not self.current_thread:
-            return ""
-        formatted_messages = []
-        for message in self.current_thread['messages']:
-            if message.get('is_bot', False):
-                user_type = f"AI {message['username']}"
-            else:
-                user_type = "Human"
-            formatted_messages.append(f"{user_type} ({message['minutes_ago']} minutes ago): {message['text']}")
-        return "\n".join(formatted_messages)
+    def get_name(self) -> str:
+        return self.username

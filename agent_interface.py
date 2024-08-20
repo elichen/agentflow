@@ -50,6 +50,13 @@ class AgentInterface(ABC):
             action (Dict[str, Any]): The action to be scheduled.
         """
         pass
+
+    @abstractmethod
+    def get_name(self) -> str:
+        """
+        Returns the name of the agent.
+        """
+        pass
     
     def _format_thread_messages(self) -> str:
         if not hasattr(self, 'current_thread') or self.current_thread is None:

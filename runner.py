@@ -9,10 +9,11 @@ from claude_llm import ClaudeLLM
 from project_manager_agent import ProjectManagerAgent
 from sarcastic_agent import SarcasticAgent
 from db import ActionDatabase
+from agent_interface import AgentInterface
 
-SLEEP_PERIOD = 60  # 1 minute for more frequent checks
+SLEEP_PERIOD = 60
 
-def process_threads(project_manager: ProjectManagerAgent, sarcastic_agent: SarcasticAgent, threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def process_threads(agents: List[AgentInterface], threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     results = []
     
     for thread in threads:
@@ -21,10 +22,6 @@ def process_threads(project_manager: ProjectManagerAgent, sarcastic_agent: Sarca
         print(f"Thread timestamp: {thread['thread_ts']}")
         print(f"Last message content:\n{thread['messages'][-1]['text']}")
         
-        # Process with ProjectManagerAgent
-        project_manager.read_thread(thread)
-        action_needed, immediate_action, delayed_action = project_manager.decide_action()
-        
         thread_result = {
             'channel': thread['channel'],
             'thread_ts': thread['thread_ts'],
@@ -32,25 +29,21 @@ def process_threads(project_manager: ProjectManagerAgent, sarcastic_agent: Sarca
             'new_actions': [],
         }
         
-        if immediate_action:
-            result = project_manager.execute_immediate_action(immediate_action)
-            thread_result['executed_actions'].append(result)
-            print(f"\nExecuted immediate action: {result}")
+        for agent in agents:
+            agent.read_thread(thread)
+            action_needed, immediate_action, delayed_action = agent.decide_action()
+            
+            if immediate_action:
+                result = agent.execute_immediate_action(immediate_action)
+                thread_result['executed_actions'].append(f"{agent.get_name()}: {result}")
+                print(f"\nExecuted immediate action for {agent.get_name()}: {result}")
+            
+            if delayed_action:
+                agent.schedule_delayed_action(delayed_action)
+                thread_result['new_actions'].append(f"{agent.get_name()} Scheduled: {delayed_action['description']} (Execute at: {delayed_action['execution_time']})")
+                print(f"\nNew action scheduled for {agent.get_name()}: {delayed_action['description']}")
         
-        if delayed_action:
-            project_manager.schedule_delayed_action(delayed_action)
-            thread_result['new_actions'].append(f"Scheduled: {delayed_action['description']} (Execute at: {delayed_action['execution_time']})")
-            print(f"\nNew action scheduled: {delayed_action['description']}")
-        
-        sarcastic_agent.read_thread(thread)
-        sarcasm_action_needed, sarcasm_immediate_action, _ = sarcastic_agent.decide_action()
-        
-        if sarcasm_action_needed and sarcasm_immediate_action:
-            result = sarcastic_agent.execute_immediate_action(sarcasm_immediate_action)
-            thread_result['executed_actions'].append(result)
-            print(f"\nExecuted sarcastic action as {sarcastic_agent.username}: {result}")
-        
-        if not action_needed and not sarcasm_action_needed:
+        if not thread_result['executed_actions'] and not thread_result['new_actions']:
             print("\nNo actions needed.")
         
         results.append(thread_result)
@@ -59,31 +52,35 @@ def process_threads(project_manager: ProjectManagerAgent, sarcastic_agent: Sarca
     
     return results
 
-def execute_due_actions(agent: ProjectManagerAgent):
+def execute_due_actions(agents: List[AgentInterface]):
     current_time = pd.Timestamp.now()
-    due_actions = agent.action_db.get_due_actions(current_time)
-    for thread_id, action in due_actions:
-        print(f"\nExecuting delayed action for thread: {thread_id}")
-        print(f"Action: {action['description']}")
-        
-        thread = agent.slack_interactor.fetch_thread(thread_id)
-        if thread:
-            agent.read_thread(thread)
-            response = agent._generate_action_response(action)
-            agent.slack_interactor.post_thread_reply(thread, response, username=agent.username)
-            print(f"Posted response in thread: {thread_id}")
+    for agent in agents:
+        due_actions = agent.action_db.get_due_actions(current_time)
+        for thread_id, action in due_actions:
+            print(f"\nExecuting delayed action for {agent.get_name()} in thread: {thread_id}")
+            print(f"Action: {action['description']}")
             
-            agent.action_db.remove_action(thread_id, action['description'])
-            print(f"Removed executed action from database")
-        else:
-            print(f"Could not fetch thread {thread_id} for action execution")
+            thread = agent.slack_interactor.fetch_thread(thread_id)
+            if thread:
+                agent.read_thread(thread)
+                response = agent._generate_action_response(action)
+                agent.slack_interactor.post_thread_reply(thread, response, username=agent.get_name())
+                print(f"Posted response in thread: {thread_id}")
+                
+                agent.action_db.remove_action(thread_id, action['description'])
+                print(f"Removed executed action from database")
+            else:
+                print(f"Could not fetch thread {thread_id} for action execution")
 
 def main():
     slack_interactor = SlackInteractor()
     llm = ClaudeLLM()
     action_db = ActionDatabase()
-    project_manager = ProjectManagerAgent(llm, action_db, slack_interactor)
-    sarcastic_agent = SarcasticAgent(llm, action_db, slack_interactor)
+    
+    agents = [
+        ProjectManagerAgent(llm, action_db, slack_interactor),
+        SarcasticAgent(llm, action_db, slack_interactor)
+    ]
 
     print("Slack Bot Runner started. Press Ctrl+C to stop.")
 
@@ -94,10 +91,10 @@ def main():
             threads = slack_interactor.organize_threads(data)
             print(f"Found {len(threads)} threads with new messages.")
 
-            results = process_threads(project_manager, sarcastic_agent, threads)
+            results = process_threads(agents, threads)
             
             print("\nChecking for due actions...")
-            execute_due_actions(project_manager)
+            execute_due_actions(agents)
             
             time.sleep(SLEEP_PERIOD)
 

@@ -1,4 +1,4 @@
-# sarcastic_agent.py
+# sarcastic_meme_agent.py
 
 from typing import Dict, Any, Tuple, Optional, List
 import pandas as pd
@@ -23,10 +23,10 @@ class SarcasticAgent(AgentInterface):
         if not self.current_thread or not self._should_respond():
             return False, None, None
 
-        sarcastic_response = self._generate_sarcastic_response()
+        emotion = self._analyze_thread_for_emotion()
 
-        if sarcastic_response:
-            return True, {"type": "immediate", "action": "sarcasm", "content": sarcastic_response}, None
+        if emotion:
+            return True, {"type": "immediate", "action": "sarcasm", "content": self._generate_sarcastic_response(emotion)}, None
 
         return False, None, None
 
@@ -40,41 +40,39 @@ class SarcasticAgent(AgentInterface):
         # This agent doesn't schedule delayed actions
         pass
 
-    def _generate_sarcastic_response(self) -> str:
+    def _analyze_thread_for_emotion(self) -> str:
         prompt = f"""
-        Analyze the following conversation and generate a brief, sarcastic response.
-        Your username in this thread is "{self.username}". Avoid responding to messages from other bots, AIs, agents, or yourself.
+        Analyze the following conversation and determine the prevalent emotion or sentiment.
+        Respond with a single word describing the emotion (e.g., happy, sad, excited, angry, etc.).
 
-        Guidelines for the sarcastic response:
-        1. Be witty and playful, expressing the opposite sentiment of the prevalent emotion in the conversation.
-        2. Use light humor and gentle teasing. Think of it as friendly banter among colleagues.
-        3. Avoid being mean-spirited, insulting, or targeting individuals directly.
-        4. Keep the response brief (1-2 sentences) and relevant to the conversation topic.
-        5. Do not include any explanatory text or meta-commentary about the sarcasm.
-        6. It's okay to be a bit cheeky or use mild exaggeration for comedic effect.
-        7. When in doubt, lean towards being more playful than biting.
+        Conversation:
+        {self._format_thread_messages()}
 
-        Remember, the goal is to add a touch of humor to the conversation, not to offend or upset anyone.
+        Prevalent emotion:
+        """
+        return self.llm.generate_response(prompt).strip().lower()
+
+    def _generate_sarcastic_response(self, emotion: str) -> str:
+        prompt = f"""
+        Generate a sarcastic response to the following conversation.
+        The prevalent emotion in the conversation is: {emotion}
+        Your response should express the opposite sentiment in a witty, but not offensive way.
+        Keep the response brief and relevant to the conversation topic.
 
         Conversation:
         {self._format_thread_messages()}
 
         Sarcastic response:
         """
-        return self.llm.generate_response(prompt).strip()
+        return self.llm.generate_response(prompt)
 
     def _should_respond(self) -> bool:
-        # Check if the last message is from a bot, AI, or agent
-        last_message = self.current_thread['messages'][-1]
-        if last_message.get('is_bot', False) or last_message.get('username', '') == self.username:
-            return False
-
         # Check if the last message is a direct action or request
-        last_message_text = last_message['text'].lower()
-        if "agentflow" in last_message_text and any(word in last_message_text for word in ["can you", "could you", "please"]):
+        last_message = self.current_thread['messages'][-1]['text'].lower()
+        if "agentflow" in last_message and any(word in last_message for word in ["can you", "could you", "please"]):
             return False
 
-        # Check sarcasm cooldown
+        # Check meme cooldown
         thread_id = self.current_thread['thread_ts']
         if thread_id in self.sarcasm_cooldown:
             if pd.Timestamp.now() - self.sarcasm_cooldown[thread_id] < self.cooldown_period:
@@ -85,14 +83,5 @@ class SarcasticAgent(AgentInterface):
     def _update_sarcasm_cooldown(self, thread_id: str) -> None:
         self.sarcasm_cooldown[thread_id] = pd.Timestamp.now()
 
-    def _format_thread_messages(self) -> str:
-        if not self.current_thread:
-            return ""
-        formatted_messages = []
-        for message in self.current_thread['messages']:
-            if message.get('is_bot', False):
-                user_type = f"AI {message['username']}"
-            else:
-                user_type = "Human"
-            formatted_messages.append(f"{user_type} ({message['minutes_ago']} minutes ago): {message['text']}")
-        return "\n".join(formatted_messages)
+    def get_name(self) -> str:
+        return self.username

@@ -73,7 +73,7 @@ class ProjectManagerAgent(AgentInterface):
             "delayed_action": {{
                 "needed": boolean,
                 "description": "Description of the delayed task, including check-ins or scheduled actions",
-                "execution_time": "When to perform the task (e.g., '5 minutes', '2 hours', '1 day', '9am tomorrow')"
+                "execution_time": "When to perform the task (use only these formats: '5 minutes', '2 hours', '1 day', '9am tomorrow', or 'daily at 9am')"
             }}
         }}
 
@@ -136,41 +136,56 @@ class ProjectManagerAgent(AgentInterface):
         now = pd.Timestamp.now()
         time_str = time_str.lower()
         
-        try:
-            # First, try to parse as an ISO format date-time string
-            return pd.Timestamp(dateutil.parser.isoparse(time_str))
-        except ValueError:
-            # If it's not an ISO format, proceed with the existing logic
-            if 'minute' in time_str:
-                minutes = int(time_str.split()[0])
-                return now + pd.Timedelta(minutes=minutes)
-            elif 'hour' in time_str:
-                hours = int(time_str.split()[0])
-                return now + pd.Timedelta(hours=hours)
-            elif 'day' in time_str:
-                days = int(time_str.split()[0])
-                return now + pd.Timedelta(days=days)
-            elif 'tomorrow' in time_str:
-                time_parts = time_str.replace(',', '').split()
-                time_index = next((i for i, part in enumerate(time_parts) if ':' in part or 'am' in part or 'pm' in part), None)
-                
-                if time_index is not None:
-                    time_part = time_parts[time_index]
-                    if ':' in time_part:
-                        hour, minute = map(int, time_part.replace('am', '').replace('pm', '').split(':'))
-                    else:
-                        hour = int(time_part.replace('am', '').replace('pm', ''))
-                        minute = 0
-                    
-                    if 'pm' in time_part and hour < 12:
-                        hour += 12
-                    
-                    return (now + pd.Timedelta(days=1)).replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if 'minute' in time_str:
+            minutes = int(time_str.split()[0])
+            return now + pd.Timedelta(minutes=minutes)
+        elif 'hour' in time_str:
+            hours = int(time_str.split()[0])
+            return now + pd.Timedelta(hours=hours)
+        elif 'day' in time_str:
+            days = int(time_str.split()[0])
+            return now + pd.Timedelta(days=days)
+        elif 'tomorrow' in time_str:
+            time_parts = time_str.replace(',', '').split()
+            time_index = next((i for i, part in enumerate(time_parts) if ':' in part or 'am' in part or 'pm' in part), None)
+            
+            if time_index is not None:
+                time_part = time_parts[time_index]
+                if ':' in time_part:
+                    hour, minute = map(int, time_part.replace('am', '').replace('pm', '').split(':'))
                 else:
-                    return (now + pd.Timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+                    hour = int(time_part.replace('am', '').replace('pm', ''))
+                    minute = 0
+                
+                if 'pm' in time_part and hour < 12:
+                    hour += 12
+                
+                return (now + pd.Timedelta(days=1)).replace(hour=hour, minute=minute, second=0, microsecond=0)
             else:
-                print(f"Warning: Could not parse execution time '{time_str}'. Defaulting to 1 hour from now.")
-                return now + pd.Timedelta(hours=1)
+                return (now + pd.Timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+        elif 'daily' in time_str:
+            time_parts = time_str.split()
+            time_index = next((i for i, part in enumerate(time_parts) if ':' in part or 'am' in part or 'pm' in part), None)
+            
+            if time_index is not None:
+                time_part = time_parts[time_index]
+                if ':' in time_part:
+                    hour, minute = map(int, time_part.replace('am', '').replace('pm', '').split(':'))
+                else:
+                    hour = int(time_part.replace('am', '').replace('pm', ''))
+                    minute = 0
+                
+                if 'pm' in time_part and hour < 12:
+                    hour += 12
+                
+                next_occurrence = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                if next_occurrence <= now:
+                    next_occurrence += pd.Timedelta(days=1)
+                return next_occurrence
+            else:
+                return now.replace(hour=9, minute=0, second=0, microsecond=0) + pd.Timedelta(days=1)
+        else:
+            raise ValueError(f"Unable to parse execution time: {time_str}")
 
     def _generate_open_items_prompt(self, thread: Dict[str, Any]) -> str:
         formatted_messages = self._format_thread_messages()

@@ -19,11 +19,11 @@ class LLMInteractor:
         channel = thread['channel']
         raw_response = self._get_llm_response(self._generate_action_prompt(conversation))
         
-        print(f"Debug: Raw LLM response:\n{raw_response}")  # Debug output
+#         print(f"Debug: Raw LLM response:\n{raw_response}")  # Debug output
         
         actions = self._extract_actions_from_response(raw_response)
         
-        print(f"Debug: Extracted actions: {actions}")  # Debug output
+#         print(f"Debug: Extracted actions: {actions}")  # Debug output
         
         immediate_action = next((action for action in actions if action['type'] == 'immediate'), None)
         delayed_action = next((action for action in actions if action['type'] == 'delayed'), None)

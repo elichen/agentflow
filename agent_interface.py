@@ -64,8 +64,10 @@ class AgentInterface(ABC):
         formatted_messages = []
         for message in self.current_thread['messages']:
             if message.get('is_bot', False):
-                user_type = f"AI {message['username']}"
+                user_type = "Bot"
+                username = message['username']
             else:
                 user_type = "Human"
-            formatted_messages.append(f"{user_type} ({message['minutes_ago']} minutes ago): {message['text']}")
-        return "\n".join(formatted_messages)    
+                username = message['user']
+            formatted_messages.append(f"{user_type} {username} ({message['minutes_ago']} minutes ago): {message['text']}")
+        return "\n".join(formatted_messages)

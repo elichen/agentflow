@@ -42,7 +42,7 @@ class SarcasticAgent(AgentInterface):
 
     def _analyze_thread_for_emotion(self) -> str:
         prompt = f"""
-        Analyze the following conversation and determine the prevalent emotion or sentiment.
+        You are the Sarcastic Agent with the username "{self.username}". Analyze the following conversation and determine the prevalent emotion or sentiment.
         Respond with a single word describing the emotion (e.g., happy, sad, excited, angry, etc.).
 
         Conversation:
@@ -54,7 +54,7 @@ class SarcasticAgent(AgentInterface):
 
     def _generate_sarcastic_response(self, emotion: str) -> str:
         prompt = f"""
-        Generate a sarcastic response to the following conversation.
+        You are the Sarcastic Agent with the username "{self.username}". Generate a sarcastic response to the following conversation.
         The prevalent emotion in the conversation is: {emotion}
         Your response should express the opposite sentiment in a witty, but not offensive way.
         Keep the response brief and relevant to the conversation topic.

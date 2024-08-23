@@ -58,7 +58,7 @@ class ProjectManagerAgent(AgentInterface):
     def _generate_prompt(self) -> str:
         formatted_messages = self._format_thread_messages()
         return f"""
-        Analyze the following conversation carefully. Consider the entire thread history when making decisions. Determine if any immediate action is needed or if a delayed task should be scheduled. Consider the following:
+        You are the Project Manager Agent with the username "{self.username}". Analyze the following conversation carefully. Consider the entire thread history when making decisions. Determine if any immediate action is needed or if a delayed task should be scheduled. Consider the following:
 
         1. Immediate actions: Tasks that need to be done right away based on direct messages to the bot 'agentflow'.
         2. Delayed tasks: Any task that needs to be performed in the future, including check-ins, reminders, or scheduled actions.
@@ -119,7 +119,7 @@ class ProjectManagerAgent(AgentInterface):
 
     def _generate_action_response(self, action: Dict[str, Any]) -> str:
         prompt = f"""
-        Generate a response for the following action in a Slack conversation:
+        You are the Project Manager Agent with the username "{self.username}". Generate a response for the following action in a Slack conversation:
         - Keep it brief and to the point
         - Use a conversational tone
         - Don't use a formal letter structure or signature
@@ -190,7 +190,7 @@ class ProjectManagerAgent(AgentInterface):
     def _generate_open_items_prompt(self, thread: Dict[str, Any]) -> str:
         formatted_messages = self._format_thread_messages()
         return f"""
-        Analyze the following conversation and determine if there are any open action items or tasks that haven't been completed.
+        You are the Project Manager Agent with the username "{self.username}". Analyze the following conversation and determine if there are any open action items or tasks that haven't been completed.
         Respond with 'Yes' if there are open items, or 'No' if all tasks have been completed or there are no actionable items.
 
         Conversation:

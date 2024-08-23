@@ -3,3 +3,4 @@ __pycache__
 .ipynb_checkpoints
 actions.json
 log.txt
+config.yaml

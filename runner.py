@@ -10,8 +10,9 @@ from project_manager_agent import ProjectManagerAgent
 from sarcastic_agent import SarcasticAgent
 from db import ActionDatabase
 from agent_interface import AgentInterface
+from config import CONFIG
 
-SLEEP_PERIOD = 60
+SLEEP_PERIOD = CONFIG['runner']['sleep_period']
 
 def process_threads(agents: List[AgentInterface], threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     results = []

@@ -1,12 +1,12 @@
 # claude_llm.py
 
-import os
+from config import CONFIG
 import anthropic
 from llm_interface import LLMInterface
 
 class ClaudeLLM(LLMInterface):
     def __init__(self):
-        self.client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        self.client = anthropic.Anthropic(api_key=CONFIG['anthropic']['api_key'])
         self.model = "claude-3-opus-20240229"
 
     def generate_response(self, prompt: str) -> str:

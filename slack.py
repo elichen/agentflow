@@ -8,11 +8,12 @@ import numpy as np
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from tqdm import tqdm
+from config import CONFIG
 
 class SlackInteractor:
-    def __init__(self, user_token: str = None, bot_token: str = None, max_retries: int = 10, base_delay: float = 1):
-        self.user_token = user_token or os.environ.get('SLACK_USER_TOKEN')
-        self.bot_token = bot_token or os.environ.get('SLACK_BOT_TOKEN')
+    def __init__(self, max_retries: int = 10, base_delay: float = 1):
+        self.user_token = CONFIG['slack']['user_token']
+        self.bot_token = CONFIG['slack']['bot_token']
         self.user_client = WebClient(token=self.user_token)
         self.bot_client = WebClient(token=self.bot_token)
         self.conversations_oldest = None

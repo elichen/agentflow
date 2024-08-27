@@ -1,15 +1,27 @@
 # AgentFlow
 AgentFlow is an open-source framework for creating persistent, intelligent AI agents capable of managing tasks and actions across extended periods. It breaks free from the constraints of traditional chat-based AI interactions, enabling the development of always-on agents that can schedule and execute tasks autonomously.
 
-# Configuration
-Before running the application, make sure to update the `config.yaml` file with your Slack and Anthropic API tokens:
+## Configuration
+Before running the application, you need to set up your configuration:
 
-1. Open `config.yaml`
-2. Replace `your_slack_bot_token_here` with your Slack bot token
-3. Replace `your_slack_user_token_here` with your Slack user token
-4. Replace `your_anthropic_api_key_here` with your Anthropic API key
+1. Copy the template configuration file:
+   ```
+   cp config.template.yaml config.yaml
+   ```
 
-# Running
+2. Open `config.yaml` in a text editor
+
+3. Replace the placeholder values with your actual API tokens and keys:
+   - Replace `your_slack_bot_token_here` with your Slack bot token
+   - Replace `your_slack_user_token_here` with your Slack user token
+   - Replace `your_anthropic_api_key_here` with your Anthropic API key
+
+4. (Optional) Adjust the `sleep_period` value if you want to change how often the main loop runs (default is 300 seconds or 5 minutes)
+
+5. Save and close the file
+
+## Running
+To start the AgentFlow system, run:
 ```
 run.sh
 ```

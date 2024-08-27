@@ -8,6 +8,7 @@ from slack import SlackInteractor
 from claude_llm import ClaudeLLM
 from project_manager_agent import ProjectManagerAgent
 from sarcastic_agent import SarcasticAgent
+from paul_graham_agent import PaulGrahamAgent  # Add this import
 from db import ActionDatabase
 from agent_interface import BaseAgent  # Changed from AgentInterface to BaseAgent
 from config import CONFIG
@@ -92,7 +93,8 @@ def main():
     
     agents = [
         ProjectManagerAgent(llm, action_db, slack_interactor),
-        SarcasticAgent(llm, action_db, slack_interactor)
+        SarcasticAgent(llm, action_db, slack_interactor),
+        PaulGrahamAgent(llm, action_db, slack_interactor)  # Add the new agent here
     ]
 
     print("Slack Bot Runner started. Press Ctrl+C to stop.")

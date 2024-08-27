@@ -56,9 +56,17 @@ class BaseAgent(ABC):
 
     def _should_respond(self) -> bool:
         thread_id = self.current_thread['thread_ts']
+        
+        # Always respond if the agent's name is mentioned
+        last_message = self.current_thread['messages'][-1]['text'].lower()
+        if self.name.lower() in last_message:
+            return True
+        
+        # Check cooldown
         if thread_id in self.cooldown:
             if pd.Timestamp.now() - self.cooldown[thread_id] < self.cooldown_period:
                 return False
+        
         return True
 
     def _update_cooldown(self, thread_id: str) -> None:

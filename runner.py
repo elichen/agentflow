@@ -9,12 +9,12 @@ from claude_llm import ClaudeLLM
 from project_manager_agent import ProjectManagerAgent
 from sarcastic_agent import SarcasticAgent
 from db import ActionDatabase
-from agent_interface import AgentInterface
+from agent_interface import BaseAgent  # Changed from AgentInterface to BaseAgent
 from config import CONFIG
 
 SLEEP_PERIOD = CONFIG['runner']['sleep_period']
 
-def process_threads(agents: List[AgentInterface], threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def process_threads(agents: List[BaseAgent], threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     results = []
     
     for thread in threads:
@@ -53,7 +53,7 @@ def process_threads(agents: List[AgentInterface], threads: List[Dict[str, Any]])
     
     return results
 
-def execute_due_actions(agents: List[AgentInterface]):
+def execute_due_actions(agents: List[BaseAgent]):
     current_time = pd.Timestamp.now()
     for agent in agents:
         due_actions = agent.action_db.get_due_actions(current_time)
@@ -64,9 +64,21 @@ def execute_due_actions(agents: List[AgentInterface]):
             thread = agent.slack_interactor.fetch_thread(thread_id)
             if thread:
                 agent.read_thread(thread)
-                response = agent._generate_action_response(action)
-                agent.slack_interactor.post_thread_reply(thread, response, username=agent.get_name())
-                print(f"Posted response in thread: {thread_id}")
+                prompt = agent._generate_prompt(due_task_description=action['description'])
+                llm_response = agent.llm.generate_response(prompt)
+                
+                if not agent._is_rejection_response(llm_response):
+                    actions = agent._extract_actions_from_response(llm_response)
+                    immediate_action = next((a for a in actions if a['type'] == 'immediate'), None)
+                    
+                    if immediate_action:
+                        response = immediate_action['response']
+                        agent.slack_interactor.post_thread_reply(thread, response, username=agent.get_name())
+                        print(f"Posted response in thread: {thread_id}")
+                    else:
+                        print(f"No immediate action generated for due task in thread: {thread_id}")
+                else:
+                    print(f"LLM rejected generating a response for due task in thread: {thread_id}")
                 
                 agent.action_db.remove_action(thread_id, action['description'])
                 print(f"Removed executed action from database")

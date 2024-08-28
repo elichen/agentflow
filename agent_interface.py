@@ -52,7 +52,8 @@ class BaseAgent(ABC):
         thread_id = self.current_thread['thread_ts']
         channel = self.current_thread['channel']
         execution_time = self._parse_execution_time(action['execution_time'])
-        self.action_db.add_action(thread_id, channel, action['description'], execution_time)
+        # This will replace any existing action for this agent in this thread
+        self.action_db.add_action(thread_id, channel, action['description'], execution_time, self.name)
 
     def _should_respond(self) -> bool:
         thread_id = self.current_thread['thread_ts']

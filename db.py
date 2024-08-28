@@ -22,25 +22,23 @@ class ActionDatabase:
         with open(self.file_path, 'w') as f:
             json.dump(serializable_actions, f, indent=2, default=str)
 
-    def add_action(self, thread_id: str, channel: str, description: str, execution_time: pd.Timestamp):
+    def add_action(self, thread_id: str, channel: str, description: str, execution_time: pd.Timestamp, agent_name: str):
         action = {
             "channel": channel,
             "description": description,
-            "execution_time": execution_time.isoformat()
+            "execution_time": execution_time.isoformat(),
+            "agent_name": agent_name
         }
         thread_id_str = str(thread_id)
         if thread_id_str not in self.actions:
             self.actions[thread_id_str] = []
         
-        # Enforce one delayed action per thread constraint
-        if len(self.actions[thread_id_str]) > 0:
-            # Replace the existing action
-            self.actions[thread_id_str] = [action]
-        else:
-            self.actions[thread_id_str].append(action)
+        # Enforce one delayed action per agent per thread constraint
+        self.actions[thread_id_str] = [a for a in self.actions[thread_id_str] if a['agent_name'] != agent_name]
+        self.actions[thread_id_str].append(action)
         
         self.save_actions()
-        print(f"Debug - Added action due at: {execution_time}")
+        print(f"Debug - Added action for {agent_name} due at: {execution_time}")
 
     def get_actions(self, thread_id: str) -> List[Dict[str, Any]]:
         return self.actions.get(str(thread_id), [])

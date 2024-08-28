@@ -56,9 +56,14 @@ def process_threads(agents: List[BaseAgent], threads: List[Dict[str, Any]]) -> L
 
 def execute_due_actions(agents: List[BaseAgent]):
     current_time = pd.Timestamp.now()
-    for agent in agents:
-        due_actions = agent.action_db.get_due_actions(current_time)
-        for thread_id, action in due_actions:
+    action_db = agents[0].action_db  # Assuming all agents share the same action_db
+    due_actions = action_db.get_due_actions(current_time)
+    
+    for thread_id, action in due_actions:
+        agent_name = action['agent_name']
+        agent = next((a for a in agents if a.get_name() == agent_name), None)
+        
+        if agent:
             print(f"\nExecuting delayed action for {agent.get_name()} in thread: {thread_id}")
             print(f"Action: {action['description']}")
             
@@ -81,10 +86,12 @@ def execute_due_actions(agents: List[BaseAgent]):
                 else:
                     print(f"LLM rejected generating a response for due task in thread: {thread_id}")
                 
-                agent.action_db.remove_action(thread_id, action['description'])
+                action_db.remove_action(thread_id, action['description'])
                 print(f"Removed executed action from database")
             else:
                 print(f"Could not fetch thread {thread_id} for action execution")
+        else:
+            print(f"Could not find agent {agent_name} for executing action in thread: {thread_id}")
 
 def main():
     slack_interactor = SlackInteractor()

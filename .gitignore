@@ -1,6 +1,6 @@
 *.pkl
 __pycache__
 .ipynb_checkpoints
-actions.json
+*.json
 log.txt
 config.yaml

@@ -5,8 +5,8 @@ import pandas as pd
 from typing import List, Dict, Any, Tuple
 
 class ActionDatabase:
-    def __init__(self, file_path='actions.json'):
-        self.file_path = file_path
+    def __init__(self, workspace_name):
+        self.file_path = f'actions_{workspace_name}.json'
         self.actions = self.load_actions()
 
     def load_actions(self) -> Dict[str, List[Dict[str, Any]]]:

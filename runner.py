@@ -97,20 +97,19 @@ def main():
     workspaces = CONFIG['workspaces']
     slack_interactors = {
         workspace_name: SlackInteractor(workspace_config)
-        for workspace_name, workspace_config in workspaces.items()
+        for _, workspace_config in workspaces.items()
     }
     llm = ClaudeLLM()
-    action_db = ActionDatabase()
     
-    agents = {
-        workspace_name: [
+    agents = {}
+    for workspace_name, slack_interactor in slack_interactors.items():
+        action_db = ActionDatabase(workspace_name)
+        agents[workspace_name] = [
             ProjectManagerAgent(llm, action_db, slack_interactor, workspace_name=workspace_name),
             SarcasticAgent(llm, action_db, slack_interactor, workspace_name=workspace_name),
             PaulGrahamAgent(llm, action_db, slack_interactor, workspace_name=workspace_name)
         ]
-        for workspace_name, slack_interactor in slack_interactors.items()
-    }
-
+    
     print("Slack Bot Runner started. Press Ctrl+C to stop.")
 
     while True:

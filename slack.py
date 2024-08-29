@@ -254,6 +254,12 @@ class SlackInteractor:
         print(f"Updated {file_path} with new messages")
         return new_messages
 
+    def fetch_new_user_messages(self, chunk_len: int = 1000, file_path: str = None) -> pd.DataFrame:
+        new_messages = self.fetch_new_messages(chunk_len, file_path)
+        new_messages['is_bot'] = new_messages['is_bot'].astype(bool)
+        user_messages = new_messages[~new_messages['is_bot']]
+        return user_messages
+
     def fetch_all_data(self, chunk_len: int = 1000, file_path: str = None) -> pd.DataFrame:
         if file_path is None:
             file_path = f'complete_conversations_{self.workspace_name}.pkl'

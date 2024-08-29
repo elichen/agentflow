@@ -94,29 +94,40 @@ def execute_due_actions(agents: List[BaseAgent]):
             print(f"Could not find agent {agent_name} for executing action in thread: {thread_id}")
 
 def main():
-    slack_interactor = SlackInteractor()
+    workspaces = CONFIG['workspaces']
+    slack_interactors = {
+        workspace_name: SlackInteractor(workspace_config)
+        for workspace_name, workspace_config in workspaces.items()
+    }
     llm = ClaudeLLM()
     action_db = ActionDatabase()
     
-    agents = [
-        ProjectManagerAgent(llm, action_db, slack_interactor),
-        SarcasticAgent(llm, action_db, slack_interactor),
-        PaulGrahamAgent(llm, action_db, slack_interactor)  # Add the new agent here
-    ]
+    agents = {
+        workspace_name: [
+            ProjectManagerAgent(llm, action_db, slack_interactor, workspace_name=workspace_name),
+            SarcasticAgent(llm, action_db, slack_interactor, workspace_name=workspace_name),
+            PaulGrahamAgent(llm, action_db, slack_interactor, workspace_name=workspace_name)
+        ]
+        for workspace_name, slack_interactor in slack_interactors.items()
+    }
 
     print("Slack Bot Runner started. Press Ctrl+C to stop.")
 
     while True:
         try:
-            print("\nFetching new messages...")
-            data = slack_interactor.fetch_new_messages()
-            threads = slack_interactor.organize_threads(data)
-            print(f"Found {len(threads)} threads with new messages.")
+            for workspace_name, slack_interactor in slack_interactors.items():
+                print(f"\nFetching new messages for workspace: {slack_interactor.workspace_name}")
+                data = slack_interactor.fetch_new_messages()
+                threads = slack_interactor.organize_threads(data)
+                print(f"Found {len(threads)} threads with new messages in {slack_interactor.workspace_name}.")
 
-            results = process_threads(agents, threads)
-            
-            print("\nChecking for due actions...")
-            execute_due_actions(agents)
+                if not slack_interactor.is_first_run:
+                    results = process_threads(agents[workspace_name], threads)
+                    print(f"\nChecking for due actions in {slack_interactor.workspace_name}...")
+                    execute_due_actions(agents[workspace_name])
+                else:
+                    print(f"First run for {slack_interactor.workspace_name}. Skipping thread processing and due actions.")
+                    slack_interactor.is_first_run = False
             
             time.sleep(SLEEP_PERIOD)
 

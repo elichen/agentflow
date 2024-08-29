@@ -11,14 +11,16 @@ from tqdm import tqdm
 from config import CONFIG
 
 class SlackInteractor:
-    def __init__(self, max_retries: int = 10, base_delay: float = 1):
-        self.user_token = CONFIG['slack']['user_token']
-        self.bot_token = CONFIG['slack']['bot_token']
+    def __init__(self, workspace_config: Dict[str, Any], max_retries: int = 10, base_delay: float = 1):
+        self.workspace_name = workspace_config['name']
+        self.user_token = workspace_config['user_token']
+        self.bot_token = workspace_config['bot_token']
         self.user_client = WebClient(token=self.user_token)
         self.bot_client = WebClient(token=self.bot_token)
         self.conversations_oldest = None
         self.max_retries = max_retries
         self.base_delay = base_delay
+        self.is_first_run = True
 
     def exponential_backoff(self, func: Callable, *args, **kwargs) -> Any:
         for attempt in range(self.max_retries):
@@ -207,14 +209,18 @@ class SlackInteractor:
             self.conversations_oldest = None
             print("No old messages, will fetch all available messages")
 
-    def fetch_new_messages(self, chunk_len: int = 1000, file_path: str = 'complete_conversations.pkl') -> pd.DataFrame:
+    def fetch_new_messages(self, chunk_len: int = 1000, file_path: str = None) -> pd.DataFrame:
+        if file_path is None:
+            file_path = f'complete_conversations_{self.workspace_name}.pkl'
         old_messages = pd.DataFrame()
         if os.path.exists(file_path):
             old_messages = self.load_old_messages(file_path)
             self.set_conversations_oldest(old_messages)
             print(f"Loaded {len(old_messages)} old messages")
+            self.is_first_run = False
         else:
             print("No existing messages found. Will fetch all available messages.")
+            self.is_first_run = True
         all_users = self.fetch_user_list()
         all_channels = pd.DataFrame(self.fetch_conversations())
         all_channels = all_channels[['id', 'name']]
@@ -248,7 +254,9 @@ class SlackInteractor:
         print(f"Updated {file_path} with new messages")
         return new_messages
 
-    def fetch_all_data(self, chunk_len: int = 1000, file_path: str = 'complete_conversations.pkl') -> pd.DataFrame:
+    def fetch_all_data(self, chunk_len: int = 1000, file_path: str = None) -> pd.DataFrame:
+        if file_path is None:
+            file_path = f'complete_conversations_{self.workspace_name}.pkl'
         new_messages = self.fetch_new_messages(chunk_len, file_path)
         all_messages = self.load_old_messages(file_path)
         return all_messages
@@ -285,7 +293,9 @@ class SlackInteractor:
             print(f"Error posting reply to thread: {e}")
             raise e
 
-    def organize_threads(self, new_messages: pd.DataFrame, file_path: str = 'complete_conversations.pkl') -> List[Dict[str, Any]]:
+    def organize_threads(self, new_messages: pd.DataFrame, file_path: str = None) -> List[Dict[str, Any]]:
+        if file_path is None:
+            file_path = f'complete_conversations_{self.workspace_name}.pkl'
         if new_messages is None or new_messages.empty:
             return []
         if os.path.exists(file_path):

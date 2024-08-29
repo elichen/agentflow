@@ -9,7 +9,7 @@ import json
 import re
 
 class BaseAgent(ABC):
-    def __init__(self, llm: LLMInterface, action_db: ActionDatabase, slack_interactor, name: str, personality: str, goal: str, cooldown_period: pd.Timedelta = pd.Timedelta(hours=1)):
+    def __init__(self, llm: LLMInterface, action_db: ActionDatabase, slack_interactor, name: str, personality: str, goal: str, workspace_name: str, cooldown_period: pd.Timedelta = pd.Timedelta(hours=1)):
         self.llm = llm
         self.action_db = action_db
         self.slack_interactor = slack_interactor
@@ -17,6 +17,7 @@ class BaseAgent(ABC):
         self.name = name
         self.personality = personality
         self.goal = goal
+        self.workspace_name = workspace_name
         self.cooldown = {}
         self.cooldown_period = cooldown_period
 

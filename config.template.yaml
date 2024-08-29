@@ -1,6 +1,12 @@
-slack:
-  bot_token: your_slack_bot_token_here
-  user_token: your_slack_user_token_here
+workspaces:
+  workspace1:
+    name: "Workspace 1 Name"
+    bot_token: your_slack_bot_token_here
+    user_token: your_slack_user_token_here
+  workspace2:
+    name: "Workspace 2 Name"
+    bot_token: your_slack_bot_token_here
+    user_token: your_slack_user_token_here
 
 anthropic:
   api_key: your_anthropic_api_key_here

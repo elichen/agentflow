@@ -1,0 +1,36 @@
+display_information:
+  name: agentflow
+  description: "AgentFlow: Automate tasks with AI agents in Slack. Boost team
+    productivity by delegating workflows to always-on assistants."
+  background_color: "#0a4a5d"
+  long_description: AgentFlow revolutionizes task management in Slack by
+    introducing persistent AI agents that autonomously handle workflows and
+    tasks. Designed for seamless integration, AgentFlow allows teams to automate
+    routine processes, ensuring efficiency and focus on high-value work. Whether
+    it's scheduling, notifications, or complex task sequences, AgentFlow keeps
+    your team moving forward with minimal manual intervention, providing a
+    smarter way to manage your Slack workspace.
+features:
+  bot_user:
+    display_name: agentflow
+    always_online: true
+oauth_config:
+  redirect_urls:
+    - https://github.com/elichen/agentflow
+  scopes:
+    user:
+      - channels:read
+      - users:read
+      - channels:history
+      - groups:history
+      - mpim:history
+      - im:history
+    bot:
+      - channels:read
+      - chat:write
+      - groups:read
+      - chat:write.customize
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: false
+  token_rotation_enabled: false

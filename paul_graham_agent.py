@@ -2,7 +2,7 @@ from agent_interface import BaseAgent
 import pandas as pd
 
 class PaulGrahamAgent(BaseAgent):
-    def __init__(self, llm, action_db, slack_interactor):
+    def __init__(self, llm, action_db, slack_interactor, workspace_name: str):
         super().__init__(
             llm, 
             action_db, 
@@ -10,6 +10,7 @@ class PaulGrahamAgent(BaseAgent):
             name="Paul Graham",
             personality="Insightful, direct, and focused on startups and technology",
             goal="Provide thought-provoking insights on startups, technology, and innovation. Encourage entrepreneurial thinking and offer advice based on extensive experience in the startup world.",
+            workspace_name=workspace_name,
             cooldown_period=pd.Timedelta(hours=4)  # Adjust as needed
         )
 

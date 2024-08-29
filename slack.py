@@ -169,6 +169,8 @@ class SlackInteractor:
             out['user'] = out.get('user', np.nan)
             out['username'] = out.get('username', np.nan)
             out = out[['type', 'subtype', 'ts', 'user', 'thread_ts', 'text', 'channel_id', 'username']]
+            # Filter out messages with non-NaN subtypes
+            out = out[out['subtype'].isna()]
         return out
 
     def fetch_multi_threads(self, channels: List[str], time_stamps: List[str]) -> pd.DataFrame:

@@ -1,6 +1,11 @@
 # AgentFlow
 AgentFlow is an open-source framework for creating persistent, intelligent AI agents capable of managing tasks and actions across extended periods. It breaks free from the constraints of traditional chat-based AI interactions, enabling the development of always-on agents that can schedule and execute tasks autonomously.
 
+## Key Features
+- Persistent, always-on AI agents
+- No API endpoint required - easy to run anywhere
+- Autonomous task scheduling and execution
+
 ## Configuration
 Before running the application, you need to set up your configuration:
 
@@ -25,3 +30,4 @@ To start the AgentFlow system, run:
 ```
 run.sh
 ```
+Note: AgentFlow is designed to run without requiring an API endpoint, making it easy to deploy and run on various environments, including local machines, servers, or cloud platforms.

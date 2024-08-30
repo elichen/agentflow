@@ -78,7 +78,7 @@ class BaseAgent(ABC):
         formatted_messages = self._format_thread_messages()
         due_task_prompt = f"\nDue task to execute: {due_task_description}" if due_task_description else ""
         return f"""
-        You are an AI agent with the following characteristics:
+        You are an AI agent bot named Agentflow with the following characteristics:
         Personality: {self.personality}
         Goal: {self.goal}
         Username: {self.name}{due_task_prompt}

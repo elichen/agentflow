@@ -315,10 +315,22 @@ class SlackInteractor:
         new_message_threads = set(new_messages['thread_ts'].dropna().unique()) | set(new_messages['ts'])
         current_time = pd.Timestamp.now()
         threads = defaultdict(list)
+        
+        # Fetch user list once
+        users = {user['id']: user['user_name'] for user in self.fetch_user_list().to_dict('records')}
+        
         for _, message in sorted_messages.iterrows():
             thread_ts = message['thread_ts'] if pd.notna(message['thread_ts']) else message['ts']
             if thread_ts in new_message_threads:
-                threads[thread_ts].append(message.to_dict())
+                # Replace @ mentions in the message text
+                text = message['text']
+                for user_id, user_name in users.items():
+                    text = text.replace(f'<@{user_id}>', f'@{user_name}')
+                
+                message_dict = message.to_dict()
+                message_dict['text'] = text
+                threads[thread_ts].append(message_dict)
+        
         organized_threads = []
         for thread_ts, messages in threads.items():
             thread = {
@@ -335,7 +347,7 @@ class SlackInteractor:
                     thread['messages'].append({
                         'ts': message['ts'],
                         'user': message['user_name'],
-                        'text': message['text'],
+                        'text': message['text'],  # This now contains the text with replaced @ mentions
                         'is_bot': message.get('is_bot', False),
                         'minutes_ago': minutes_ago,
                         'username': message.get('username', 'Unknown')

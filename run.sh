@@ -5,7 +5,7 @@ run_script() {
     while true; do
         # Run the Python script in the background, with unbuffered output
         # Redirect stdout and stderr to log.txt
-        python -u runner.py >> log.txt 2>&1
+        python -u src/runner.py >> log.txt 2>&1
         # Wait for a second before restarting to avoid rapid restarts
         sleep 1
     done

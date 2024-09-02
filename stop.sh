@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Find all PIDs of the running python script using the name "runner.py"
-PYTHON_PIDS=$(pgrep -f "python -u runner.py")
+PYTHON_PIDS=$(pgrep -f "python -u src/runner.py")
 
 # Find all PIDs of the running "run.sh" script
 RUNSH_PIDS=$(pgrep -f "/bin/bash ./run.sh")

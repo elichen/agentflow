@@ -4,7 +4,7 @@ import time
 import sys
 from typing import List, Dict, Any
 import pandas as pd
-from slack import SlackInteractor
+from slack_interactor import SlackInteractor
 from claude_llm import ClaudeLLM
 from project_manager_agent import ProjectManagerAgent
 from sarcastic_agent import SarcasticAgent

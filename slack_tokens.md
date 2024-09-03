@@ -12,7 +12,7 @@
 ## Step 2: Install the App to Your Workspace
 
 1. After creating the app, you'll be on the app's management page.
-2. Click on the "Install to Workspace" button.
+2. Click on the "Install to Workspace" button under "Install App" menu.
 3. Review the permissions and click "Allow" to install the app to your workspace.
 
 ## Step 3: Obtain the Tokens

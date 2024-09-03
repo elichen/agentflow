@@ -35,6 +35,16 @@ For detailed instructions on how to create a Slack app and obtain the necessary 
 - Obtaining both the Bot User OAuth Token and User OAuth Token
 - Securely adding these tokens to your app configuration
 
+## Inviting the Agent to a Slack Channel
+After setting up your Slack app and obtaining the tokens:
+
+1. Open your Slack workspace
+2. Navigate to the channel where you want the agent to operate
+3. Type `/invite @YourBotName` (replace YourBotName with the actual name of your bot)
+4. Press Enter to send the invitation
+
+The agent will now be able to read messages and respond in this channel.
+
 ## Running
 To start the AgentFlow system, run:
 ```

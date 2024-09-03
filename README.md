@@ -20,6 +20,7 @@ Before running the application, you need to set up your configuration:
    - Replace `your_slack_bot_token_here` with your Slack bot token
    - Replace `your_slack_user_token_here` with your Slack user token
    - Replace `your_anthropic_api_key_here` with your Anthropic API key
+   - Replace `your_openai_api_key_here` with your OpenAI API key
 
 4. (Optional) Adjust the `sleep_period` value if you want to change how often the main loop runs (default is 300 seconds or 5 minutes)
 

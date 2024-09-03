@@ -4,9 +4,9 @@ from agent_interface import BaseAgent
 import pandas as pd
 
 class ProjectManagerAgent(BaseAgent):
-    def __init__(self, llm, action_db, slack_interactor, workspace_name: str):
+    def __init__(self, llm_type: str, action_db, slack_interactor, workspace_name: str):
         super().__init__(
-            llm, 
+            llm_type,
             action_db, 
             slack_interactor,
             name="PM Agent",

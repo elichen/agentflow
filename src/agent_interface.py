@@ -3,14 +3,21 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Tuple, Optional, List
 from llm_interface import LLMInterface
+from claude_llm import ClaudeLLM
+from openai_llm import OpenAILLM
 from db import ActionDatabase
 import pandas as pd
 import json
 import re
 
 class BaseAgent(ABC):
-    def __init__(self, llm: LLMInterface, action_db: ActionDatabase, slack_interactor, name: str, personality: str, goal: str, workspace_name: str, cooldown_period: pd.Timedelta = pd.Timedelta(hours=1)):
-        self.llm = llm
+    def __init__(self, llm_type: str, action_db: ActionDatabase, slack_interactor, name: str, personality: str, goal: str, workspace_name: str, cooldown_period: pd.Timedelta = pd.Timedelta(hours=1)):
+        if llm_type == "claude":
+            self.llm = ClaudeLLM()
+        elif llm_type == "openai":
+            self.llm = OpenAILLM()
+        else:
+            raise ValueError(f"Invalid LLM type: {llm_type}")
         self.action_db = action_db
         self.slack_interactor = slack_interactor
         self.current_thread = None

@@ -8,10 +8,10 @@ from slack_interactor import SlackInteractor
 from claude_llm import ClaudeLLM
 from db import ActionDatabase
 from config import CONFIG
-from agent_interface import BaseAgent  # Changed from AgentInterface to BaseAgent
+from agent_interface import BaseAgent
 from project_manager_agent import ProjectManagerAgent
 from sarcastic_agent import SarcasticAgent
-from paul_graham_agent import PaulGrahamAgent  # Add this import
+from paul_graham_agent import PaulGrahamAgent
 from drunk_agent import DrunkAgent
 
 SLEEP_PERIOD = CONFIG['runner']['sleep_period']
@@ -100,18 +100,29 @@ def main():
         workspace_config['name']: SlackInteractor(workspace_config)
         for _, workspace_config in workspaces.items()
     }
-    llm = ClaudeLLM()
 
     agents = {}
-    for workspace_name, slack_interactor in slack_interactors.items():
+    for _, workspace_config in workspaces.items():
+        workspace_name = workspace_config['name']
+        slack_interactor = slack_interactors[workspace_name]
         action_db = ActionDatabase(workspace_name)
-        agents[workspace_name] = [
-            ProjectManagerAgent(llm, action_db, slack_interactor, workspace_name=workspace_name),
-            SarcasticAgent(llm, action_db, slack_interactor, workspace_name=workspace_name),
-            PaulGrahamAgent(llm, action_db, slack_interactor, workspace_name=workspace_name),
-            DrunkAgent(llm, action_db, slack_interactor, workspace_name=workspace_name)
-        ]
-    
+        agents[workspace_name] = []
+        
+        agent_classes = {
+            'ProjectManagerAgent': ProjectManagerAgent,
+            'SarcasticAgent': SarcasticAgent,
+            'PaulGrahamAgent': PaulGrahamAgent,
+            'DrunkAgent': DrunkAgent
+        }
+        
+        for agent_name in workspace_config.get('agents', []):
+            if agent_name in agent_classes:
+                agent_class = agent_classes[agent_name]
+                agent = agent_class("claude", action_db, slack_interactor, workspace_name=workspace_name)
+                agents[workspace_name].append(agent)
+            else:
+                print(f"Warning: Unknown agent type '{agent_name}' for workspace '{workspace_name}'")
+
     print("Slack Bot Runner started. Press Ctrl+C to stop.")
 
     while True:

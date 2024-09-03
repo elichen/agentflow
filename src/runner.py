@@ -6,12 +6,13 @@ from typing import List, Dict, Any
 import pandas as pd
 from slack_interactor import SlackInteractor
 from claude_llm import ClaudeLLM
+from db import ActionDatabase
+from config import CONFIG
+from agent_interface import BaseAgent  # Changed from AgentInterface to BaseAgent
 from project_manager_agent import ProjectManagerAgent
 from sarcastic_agent import SarcasticAgent
 from paul_graham_agent import PaulGrahamAgent  # Add this import
-from db import ActionDatabase
-from agent_interface import BaseAgent  # Changed from AgentInterface to BaseAgent
-from config import CONFIG
+from drunk_agent import DrunkAgent
 
 SLEEP_PERIOD = CONFIG['runner']['sleep_period']
 
@@ -107,7 +108,8 @@ def main():
         agents[workspace_name] = [
             ProjectManagerAgent(llm, action_db, slack_interactor, workspace_name=workspace_name),
             SarcasticAgent(llm, action_db, slack_interactor, workspace_name=workspace_name),
-            PaulGrahamAgent(llm, action_db, slack_interactor, workspace_name=workspace_name)
+            PaulGrahamAgent(llm, action_db, slack_interactor, workspace_name=workspace_name),
+            DrunkAgent(llm, action_db, slack_interactor, workspace_name=workspace_name)
         ]
     
     print("Slack Bot Runner started. Press Ctrl+C to stop.")

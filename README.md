@@ -22,9 +22,18 @@ Before running the application, you need to set up your configuration:
    - Replace `your_anthropic_api_key_here` with your Anthropic API key
    - Replace `your_openai_api_key_here` with your OpenAI API key
 
+   For instructions on obtaining Slack tokens, refer to the `slack_tokens.md` file in this repository.
+
 4. (Optional) Adjust the `sleep_period` value if you want to change how often the main loop runs (default is 300 seconds or 5 minutes)
 
 5. Save and close the file
+
+## Obtaining Slack Tokens
+For detailed instructions on how to create a Slack app and obtain the necessary tokens, please refer to the `slack_tokens.md` file in this repository. This file provides step-by-step guidance on:
+- Creating a Slack app using the `manifest.yml` file
+- Installing the app to your workspace
+- Obtaining both the Bot User OAuth Token and User OAuth Token
+- Securely adding these tokens to your app configuration
 
 ## Running
 To start the AgentFlow system, run:

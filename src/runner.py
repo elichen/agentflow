@@ -98,11 +98,11 @@ def main():
     workspaces = CONFIG['workspaces']
     slack_interactors = {
         workspace_config['name']: SlackInteractor(workspace_config)
-        for _, workspace_config in workspaces.items()
+        for workspace_config in workspaces
     }
 
     agents = {}
-    for _, workspace_config in workspaces.items():
+    for workspace_config in workspaces:
         workspace_name = workspace_config['name']
         slack_interactor = slack_interactors[workspace_name]
         action_db = ActionDatabase(workspace_name)

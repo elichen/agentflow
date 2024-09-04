@@ -1,6 +1,5 @@
 workspaces:
-  workspace1:
-    name: "Workspace 1 Name"
+  - name: "Workspace 1 Name"
     bot_token: your_slack_bot_token_here
     user_token: your_slack_user_token_here
     agents:
@@ -12,8 +11,7 @@ workspaces:
         llm_type: claude
       - name: DrunkAgent
         llm_type: openai
-  workspace2:
-    name: "Workspace 2 Name"
+  - name: "Workspace 2 Name"
     bot_token: your_slack_bot_token_here
     user_token: your_slack_user_token_here
     agents:

@@ -4,19 +4,27 @@ workspaces:
     bot_token: your_slack_bot_token_here
     user_token: your_slack_user_token_here
     agents:
-      - ProjectManagerAgent
-      - SarcasticAgent
-      - PaulGrahamAgent
-      - DrunkAgent
+      - name: ProjectManagerAgent
+        llm_type: claude
+      - name: SarcasticAgent
+        llm_type: openai
+      - name: PaulGrahamAgent
+        llm_type: claude
+      - name: DrunkAgent
+        llm_type: openai
   workspace2:
     name: "Workspace 2 Name"
     bot_token: your_slack_bot_token_here
     user_token: your_slack_user_token_here
     agents:
-      - ProjectManagerAgent
+      - name: ProjectManagerAgent
+        llm_type: openai
 
 anthropic:
   api_key: your_anthropic_api_key_here
+
+openai:
+  api_key: your_openai_api_key_here
 
 runner:
   sleep_period: 300  # in seconds

@@ -115,10 +115,12 @@ def main():
             'DrunkAgent': DrunkAgent
         }
         
-        for agent_name in workspace_config.get('agents', []):
+        for agent_config in workspace_config.get('agents', []):
+            agent_name = agent_config['name']
+            llm_type = agent_config['llm_type']
             if agent_name in agent_classes:
                 agent_class = agent_classes[agent_name]
-                agent = agent_class("claude", action_db, slack_interactor, workspace_name=workspace_name)
+                agent = agent_class(llm_type, action_db, slack_interactor, workspace_name=workspace_name)
                 agents[workspace_name].append(agent)
             else:
                 print(f"Warning: Unknown agent type '{agent_name}' for workspace '{workspace_name}'")

@@ -13,6 +13,7 @@ from project_manager_agent import ProjectManagerAgent
 from sarcastic_agent import SarcasticAgent
 from paul_graham_agent import PaulGrahamAgent
 from drunk_agent import DrunkAgent
+import random
 
 class Runner:
     def __init__(self):
@@ -84,7 +85,7 @@ class Runner:
                 print(f"Waiting for {self.sleep_period} seconds before retrying...")
                 time.sleep(self.sleep_period)
 
-    def _process_threads(self, agents: List[BaseAgent], threads: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _process_threads(self, agents, threads):
         results = []
         
         for thread in threads:
@@ -100,7 +101,10 @@ class Runner:
                 'new_actions': [],
             }
             
-            for agent in agents:
+            # Shuffle the agents list for this thread
+            shuffled_agents = random.sample(agents, len(agents))
+            
+            for agent in shuffled_agents:
                 agent.read_thread(thread)
                 action_needed, immediate_action, delayed_action = agent.decide_action()
                 

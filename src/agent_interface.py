@@ -225,5 +225,17 @@ class BaseAgent(ABC):
         for message in self.current_thread['messages']:
             user_type = "Bot" if message.get('is_bot', False) else "Human"
             username = message['username'] if message.get('is_bot', False) else message['user']
-            formatted_messages.append(f"{user_type} {username} ({message['minutes_ago']} minutes ago): {message['text']}")
+            
+            # Convert minutes to a more readable format
+            minutes_ago = message['minutes_ago']
+            if minutes_ago < 60:
+                time_ago = f"{minutes_ago} minutes ago"
+            elif minutes_ago < 1440:  # Less than 24 hours
+                hours_ago = minutes_ago // 60
+                time_ago = f"{hours_ago} hours ago"
+            else:
+                days_ago = minutes_ago // 1440
+                time_ago = f"{days_ago} days ago"
+            
+            formatted_messages.append(f"{user_type} {username} ({time_ago}): {message['text']}")
         return "\n".join(formatted_messages)
